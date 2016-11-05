@@ -9,7 +9,9 @@ from vizdoom_wrapper import VizdoomWrapper
 from networks import create_network
 from tqdm import trange
 from threading import Thread
-from termcolor import colored
+from util.coloring import red, green, blue
+from time import strftime
+import tensorflow as tf
 
 
 class ActorLearner(Thread):
@@ -19,22 +21,18 @@ class ActorLearner(Thread):
                  # TODO somehow move global train step somewhere else
                  global_train_step,
                  optimizer,
-                 silent=False,
                  **settings):
         super(ActorLearner, self).__init__()
 
-        self._session = None
-        self._global_steps_counter = None
-
+        print("Spawning actor-learner #{}.".format(thread_index))
         self.index = thread_index
-        self._silent = silent
-        if not self._silent:
-            print("Spawning actor-learner #{}.".format(thread_index))
+        self._settings = settings
+        date_string = strftime("%d.%m.%y-%H:%M")
+        self._run_string = "{}/{}_{}/{}".format(settings["base_tag"], settings["network_type"], settings["threads_num"],
+                                                date_string)
 
-        self.steps_per_epoch = settings["steps_per_epoch"]
-        self._print_logs = not silent and (settings["all_threads_log"] or self.index == 0)
-        self._run_tests = settings["test_episodes_per_epoch"] > 0 and (
-            settings["all_threads_test"] or self.index == 0) and settings["run_tests"]
+        self.steps_per_epoch = settings["local_steps_per_epoch"]
+        self._run_tests = settings["test_episodes_per_epoch"] > 0 and settings["run_tests"]
         self.test_episodes_per_epoch = settings["test_episodes_per_epoch"]
         self._epochs = np.float32(settings["epochs"])
         self.max_remembered_steps = settings["max_remembered_steps"]
@@ -52,13 +50,28 @@ class ActorLearner(Thread):
         grads_and_global_vars = zip(grads, global_network.get_params())
 
         self.train_op = optimizer.apply_gradients(grads_and_global_vars, global_step=global_train_step)
-
-        self.sync = self.local_network.ops.sync(global_network)
+        self.sync_op = self.local_network.ops.sync(global_network)
 
         self.local_steps = 0
         self._epoch = 1
-
         self.train_scores = []
+
+        self._train_writer = None
+        self._test_writer = None
+        if self.index == 0:
+            self._model_savefile = settings["models_path"] + "/" + self._run_string
+            self.test_score = tf.placeholder(tf.float32)
+            self.score_summary = tf.placeholder(tf.float32)
+            tf.scalar_summary(self._run_string + "/score", self.score_summary)
+            self._summaries = tf.merge_all_summaries()
+        else:
+            self._model_savefile = None
+
+            self._summaries = None
+
+        self._saver = None
+        self._session = None
+        self._global_steps_counter = None
 
     @staticmethod
     def choose_action_index(policy, deterministic=True):
@@ -74,7 +87,7 @@ class ActorLearner(Thread):
 
         return len(policy) - 1
 
-    def train_step(self):
+    def make_training_step(self):
         states = []
         actions = []
         rewards = []
@@ -82,12 +95,12 @@ class ActorLearner(Thread):
 
         terminal_end = False
 
-        self._session.run(self.sync)
+        self._session.run(self.sync_op)
 
         if self.local_network.has_state():
             initial_network_state = self.local_network.get_current_network_state()
 
-        start_local_t = self.local_steps
+        start_local_steps = self.local_steps
 
         iteration = 0
         while True:
@@ -110,7 +123,7 @@ class ActorLearner(Thread):
 
             if terminal:
                 terminal_end = True
-                if self._print_logs:
+                if self.index == 0:
                     self.train_scores.append(self.doom_wrapper.get_total_reward())
                 self.doom_wrapper.reset()
                 if self.local_network.has_state():
@@ -150,7 +163,7 @@ class ActorLearner(Thread):
             train_op_feed_dict[self.local_network.vars.sequence_length] = [len(batch_a)]
 
         self._session.run(self.train_op, feed_dict=train_op_feed_dict)
-        steps_performed = self.local_steps - start_local_t
+        steps_performed = self.local_steps - start_local_steps
 
         return steps_performed
 
@@ -178,16 +191,13 @@ class ActorLearner(Thread):
         test_duration = test_end_time - test_start_time
         score_mean = np.mean(test_rewards)
         score_std = np.std(test_rewards)
-        if not self._silent:
-            print(
-                "th#{} Test: {:0.2f}±{:0.2f}, test time: {}".format(self.index, score_mean, score_std,
-                                                                    sec_to_str(test_duration)))
-        return
+        print(
+            "Test: {}, test time: {}".format(green("{:0.2f}±{:0.2f}".format(score_mean, score_std)),
+                                             sec_to_str(test_duration)))
+        return score_mean
 
-    def _print_log(self, overall_start_time, last_log_time, steps):
+    def _print_log(self, score, overall_start_time, last_log_time, steps):
         current_time = time.time()
-        mean_score = np.mean(self.train_scores)
-        self.train_scores = []
 
         elapsed_time = time.time() - overall_start_time
         global_steps = self._global_steps_counter.get()
@@ -196,10 +206,10 @@ class ActorLearner(Thread):
         global_mil_steps_per_hour = global_steps_per_sec * 3600 / 1000000.0
         # TODO compute local speed without tests
         print(
-            "th#{} {}:, Score: {:.2f}, GlobalSteps: {}, LocalSpd: {:.0f} STEPS/s GlobalSpd: {:.0f} STEPS/s,"
+            "TRAIN: Score: {}, GlobalSteps: {}, LocalSpd: {:.0f} STEPS/s GlobalSpd: {} STEPS/s,"
             " {:.2f}M STEPS/hour, overall time: {}".format(
-                self.index, self.local_steps, mean_score, global_steps, local_steps_per_sec,
-                global_steps_per_sec,
+                green("{:.3f}".format(score)), global_steps, local_steps_per_sec,
+                blue("{:.0f}".format(global_steps_per_sec)),
                 global_mil_steps_per_hour,
                 sec_to_str(elapsed_time)
             ))
@@ -210,27 +220,46 @@ class ActorLearner(Thread):
             last_log_time = overall_start_time
             local_steps_for_log = 0
             while self._epoch <= self._epochs:
-                steps = self.train_step()
-                self._global_steps_counter.inc(steps)
+                steps = self.make_training_step()
                 local_steps_for_log += steps
+                global_steps = self._global_steps_counter.inc(steps)
 
                 # Logs & tests
                 if self.steps_per_epoch * self._epoch <= self.local_steps:
                     self._epoch += 1
 
-                    if self._print_logs:
-                        self._print_log(overall_start_time, last_log_time, local_steps_for_log)
+                    if self.index == 0:
 
-                    if self._run_tests:
-                        self.test(self._session, self.test_episodes_per_epoch)
+                        train_score = np.mean(self.train_scores)
+                        self.train_scores = []
+                        self._print_log(train_score, overall_start_time, last_log_time, local_steps_for_log)
+                        train_summary = self._session.run(self._summaries, {self.score_summary: train_score})
+                        self._train_writer.add_summary(train_summary, global_steps)
+                        if self._run_tests:
+                            test_score = self.test(self._session, self.test_episodes_per_epoch)
+                            test_summary = self._session.run(self._summaries, {self.score_summary: test_score})
+                            self._test_writer.add_summary(test_summary, global_steps)
 
                     last_log_time = time.time()
                     local_steps_for_log = 0
 
         except (SignalException, ViZDoomUnexpectedExitException):
-            threadsafe_print(colored("Thread #{} aborting(ViZDoom killed).".format(self.index), "red"))
+            threadsafe_print(red("Thread #{} aborting(ViZDoom killed).".format(self.index)))
 
     def run_training(self, session, global_steps_counter):
+        if self.index == 0:
+            # TODO make including sesion.graph optional
+            logdir = self._settings["logdir"]
+            if self._settings["run"] is not None:
+                logdir += "/" + str(self._settings["run"])
+
+            self._train_writer = tf.train.SummaryWriter(logdir + "/train")
+            if self._run_tests:
+                self._test_writer = tf.train.SummaryWriter(logdir + "/test")
+            else:
+                self._test_writer = None
+            # TODO create saver
+            self._saver = None
         self._session = session
         self._global_steps_counter = global_steps_counter
         self.start()

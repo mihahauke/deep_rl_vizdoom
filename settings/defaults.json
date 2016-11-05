@@ -1,6 +1,7 @@
 {
   "config_file": "/home/ebony/pip_vizdoom/scenarios/basic.cfg",
   "display": false,
+  "run": null,
   "use_freedoom": false,
   "threads_num": 16,
   "network_type": "basic_lstm",
@@ -17,7 +18,7 @@
   "max_remembered_steps": 5,
   "gamma": 0.99,
   "epochs": "Inf",
-  "steps_per_epoch": 2000,
+  "start_local_steps": 5000,
   "test_episodes_per_epoch": 100,
   "entropy_beta": 0.01,
   "frame_skip": 12,
@@ -28,8 +29,7 @@
     "momentum": 0.0,
     "clip_norm": 40.0
   },
-  "all_threads_log": false,
-  "all_threads_test": false,
-  "silent": false,
-  "run_tests": true
+  "run_tests": true,
+  "models_path": "models",
+  "logdir": "logs"
 }

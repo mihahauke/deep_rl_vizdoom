@@ -3,6 +3,7 @@
 
 import json
 from util.parsers import parse_train_a3c_args
+import os
 
 
 def train_a3c(settings, args):
@@ -38,8 +39,8 @@ def train_a3c(settings, args):
     config = tf.ConfigProto(log_device_placement=False,
                             allow_soft_placement=True)
     config.gpu_options.allow_growth = True
-
     session = tf.Session(config=config)
+
     init = tf.initialize_all_variables()
     session.run(init)
 
@@ -52,9 +53,15 @@ def train_a3c(settings, args):
 if __name__ == "__main__":
     default_settings_filepath = "settings/defaults.json"
     override_settings_filepath = "settings/basic.json"
-    settings = json.load(file(default_settings_filepath))
+    a3c_settings = json.load(file(default_settings_filepath))
     override_settings = json.load(file(override_settings_filepath))
-    settings.update(override_settings)
+    a3c_settings.update(override_settings)
 
     args = parse_train_a3c_args()
-    train_a3c(settings, args)
+    # TODO override settings according to args
+
+    if not os.path.isdir(a3c_settings["models_path"]):
+        os.makedirs(a3c_settings["models_path"])
+    if not os.path.isdir(a3c_settings["logdir"]):
+        os.makedirs(a3c_settings["logdir"])
+    train_a3c(a3c_settings, args)

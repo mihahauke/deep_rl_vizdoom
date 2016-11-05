@@ -1,6 +1,7 @@
 {
   "config_file": "basic.cfg",
   "base_tag": "basic",
+  "run": null,
   "display": false,
   "use_freedoom": false,
   "threads_num": 16,
@@ -18,10 +19,10 @@
   "max_remembered_steps": 5,
   "gamma": 0.99,
   "epochs": "Inf",
-  "steps_per_epoch": 200,
+  "local_steps_per_epoch": 10000,
   "test_episodes_per_epoch": 100,
   "entropy_beta": 0.01,
-  "frame_skip": 8,
+  "frame_skip": 4,
   "reward_scale": 0.01,
   "rmsprop": {
     "epsilon": 0.1,
@@ -29,8 +30,7 @@
     "momentum": 0.0,
     "clip_norm": 0.0
   },
-  "all_threads_log": false,
-  "all_threads_test": false,
-  "silent": false,
-  "run_tests": true
+  "run_tests": true,
+  "models_path": "models",
+  "logdir": "logs"
 }

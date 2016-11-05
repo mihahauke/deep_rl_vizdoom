@@ -93,3 +93,4 @@ tmp
 _vizdoom.ini
 models
 logs
+clear_logs.sh
