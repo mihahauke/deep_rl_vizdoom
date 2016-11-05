@@ -35,6 +35,7 @@ class ThreadsafeCounter(object):
     def inc(self, val=1):
         with self._lock:
             self._val += val
+        return self._val
 
 
 class Record(object):
