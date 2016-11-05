@@ -1,5 +1,5 @@
 {
-  "config_file": "../pip_vizdoom/scenarios/basic.cfg",
+  "config_file": "basic.cfg",
   "base_tag": "basic",
   "display": false,
   "use_freedoom": false,
@@ -18,10 +18,10 @@
   "max_remembered_steps": 5,
   "gamma": 0.99,
   "epochs": "Inf",
-  "steps_per_epoch": 2000,
+  "steps_per_epoch": 200,
   "test_episodes_per_epoch": 100,
   "entropy_beta": 0.01,
-  "frame_skip": 12,
+  "frame_skip": 8,
   "reward_scale": 0.01,
   "rmsprop": {
     "epsilon": 0.1,

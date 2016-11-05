@@ -3,6 +3,7 @@ import numpy as np
 import itertools as it
 import vizdoom as vzd
 import skimage.transform
+import os
 
 
 class VizdoomWrapper():
@@ -17,6 +18,7 @@ class VizdoomWrapper():
                  use_freedoom=False,
                  last_action_input=False,
                  ignore_misc=False,
+                 scenarios_path=os.path.join(vzd.__path__[0], "scenarios"),
                  **kwargs):
 
         if ignore_misc:
@@ -30,7 +32,7 @@ class VizdoomWrapper():
         if use_freedoom:
             doom.set_doom_game_path(vzd.__path__[0] + "/freedoom2.wad")
         self.doom = doom
-        doom.load_config(str(config_file))
+        doom.load_config(os.path.join(scenarios_path,str(config_file)))
         doom.set_window_visible(display)
         doom.set_screen_format(vzd.ScreenFormat.GRAY8)
         doom.set_screen_resolution(vzd.ScreenResolution.RES_160X120)
