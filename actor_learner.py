@@ -264,8 +264,8 @@ class ActorLearner(Thread):
         if self.index == 0:
             # TODO make including sesion.graph optional
             logdir = self._settings["logdir"]
-            if self._settings["run"] is not None:
-                logdir += "/" + str(self._settings["run"])
+            if self._settings["run_tag"] is not None:
+                logdir += "/" + str(self._settings["run_tag"])
 
             self._train_writer = tf.train.SummaryWriter(logdir + "/train")
             if self._run_tests:
