@@ -4,6 +4,7 @@ import itertools as it
 import vizdoom as vzd
 import skimage.transform
 import os
+from util import threadsafe_print
 
 
 class VizdoomWrapper():

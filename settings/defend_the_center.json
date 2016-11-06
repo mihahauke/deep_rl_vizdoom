@@ -1,11 +1,10 @@
 {
-  "config_file": "predict_position.cfg",
-  "base_tag": "predict_position/",
+  "config_file": "defend_the_center.cfg",
+  "base_tag": "defend_the_center",
   "run_tag": null,
   "display": false,
-  "use_freedoom": false,
   "threads_num": 16,
-  "network_type": "ff",
+  "network_type": "lstm",
   "device": "/gpu:0",
   "test_episodes": 100,
   "resolution": [
@@ -30,7 +29,5 @@
     "momentum": 0.0,
     "clip_norm": 0.0
   },
-  "run_tests": true,
-  "models_path": "models",
-  "logdir": "logs"
+  "run_tests": true
 }

@@ -1,7 +1,7 @@
 {
   "config_file": "/home/ebony/pip_vizdoom/scenarios/basic.cfg",
   "display": false,
-  "run": null,
+  "run_tag": null,
   "use_freedoom": false,
   "threads_num": 16,
   "network_type": "basic_lstm",
@@ -21,7 +21,7 @@
   "start_local_steps": 10000,
   "test_episodes_per_epoch": 100,
   "entropy_beta": 0.01,
-  "frame_skip": 12,
+  "frame_skip": 4,
   "reward_scale": 0.01,
   "rmsprop": {
     "epsilon": 0.1,

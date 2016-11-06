@@ -1,9 +1,8 @@
 {
   "config_file": "basic.cfg",
   "base_tag": "basic",
-  "run": null,
+  "run_tag": null,
   "display": false,
-  "use_freedoom": false,
   "threads_num": 16,
   "network_type": "lstm",
   "device": "/gpu:0",
@@ -30,7 +29,5 @@
     "momentum": 0.0,
     "clip_norm": 0.0
   },
-  "run_tests": true,
-  "models_path": "models",
-  "logdir": "logs"
+  "run_tests": true
 }

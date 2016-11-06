@@ -74,10 +74,11 @@ class ActorLearner(Thread):
         self._global_steps_counter = None
 
     @staticmethod
-    def choose_action_index(policy, deterministic=True):
+    def choose_action_index(policy, deterministic=False):
         if deterministic:
             return np.argmax(policy)
 
+        # TODO the sum should be 1 so ...
         r = random.random() * np.sum(policy)
         cummulative_sum = 0.0
         for i, p in enumerate(policy):
@@ -110,7 +111,6 @@ class ActorLearner(Thread):
             current_state = self.doom_wrapper.get_current_state()
             policy, state_value = self.local_network.get_policy_and_value(self._session, current_state)
             action_index = ActorLearner.choose_action_index(policy)
-
             states.insert(0, current_state)
             actions.insert(0, action_index)
             values.insert(0, state_value)
