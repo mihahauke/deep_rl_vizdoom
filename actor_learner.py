@@ -189,27 +189,41 @@ class ActorLearner(Thread):
 
         test_end_time = time.time()
         test_duration = test_end_time - test_start_time
-        score_mean = np.mean(test_rewards)
+        min_score = np.min(test_rewards)
+        max_score = np.max(test_rewards)
+        mean_score = np.mean(test_rewards)
         score_std = np.std(test_rewards)
         print(
-            "Test: {}, test time: {}".format(green("{:0.2f}±{:0.2f}".format(score_mean, score_std)),
-                                             sec_to_str(test_duration)))
-        return score_mean
+            "TEST: mean: {}, min: {}, max: {} ,test time: {}".format(
+                green("{:0.3f}±{:0.2f}".format(mean_score, score_std)),
+                red("{:0.3f}".format(min_score)),
+                blue("{:0.3f}".format(max_score)),
+                sec_to_str(test_duration)))
+        return mean_score
 
-    def _print_log(self, score, overall_start_time, last_log_time, steps):
+    def _print_log(self, scores, overall_start_time, last_log_time, steps):
         current_time = time.time()
+        mean_score = np.mean(scores)
+        score_std = np.std(scores)
+        min_score = np.min(scores)
+        max_score = np.max(scores)
 
         elapsed_time = time.time() - overall_start_time
         global_steps = self._global_steps_counter.get()
         local_steps_per_sec = steps / (current_time - last_log_time)
         global_steps_per_sec = global_steps / elapsed_time
         global_mil_steps_per_hour = global_steps_per_sec * 3600 / 1000000.0
-        # TODO compute local speed without tests
         print(
-            "TRAIN: Score: {}, GlobalSteps: {}, LocalSpd: {:.0f} STEPS/s GlobalSpd: {} STEPS/s,"
-            " {:.2f}M STEPS/hour, overall time: {}".format(
-                green("{:.3f}".format(score)), global_steps, local_steps_per_sec,
-                blue("{:.0f}".format(global_steps_per_sec)),
+            "TRAIN: mean: {}, min: {}, max:{}, "
+            "GlobalSteps: {}, LocalSpd: {:.0f} STEPS/s GlobalSpd: "
+            "{} STEPS/s, {:.2f}M STEPS/hour, overall time: {}".format(
+                green("{:0.3f}±{:0.2f}".format(mean_score, score_std)),
+                red("{:0.3f}".format(min_score)),
+                blue("{:0.3f}".format(max_score)),
+                global_steps,
+                local_steps_per_sec,
+                blue("{:.0f}".format(
+                    global_steps_per_sec)),
                 global_mil_steps_per_hour,
                 sec_to_str(elapsed_time)
             ))
@@ -229,11 +243,11 @@ class ActorLearner(Thread):
                     self._epoch += 1
 
                     if self.index == 0:
-
-                        train_score = np.mean(self.train_scores)
+                        self._print_log(self.train_scores, overall_start_time, last_log_time, local_steps_for_log)
+                        mean_train_scre = np.mean(self.train_scores)
                         self.train_scores = []
-                        self._print_log(train_score, overall_start_time, last_log_time, local_steps_for_log)
-                        train_summary = self._session.run(self._summaries, {self.score_summary: train_score})
+
+                        train_summary = self._session.run(self._summaries, {self.score_summary: mean_train_scre})
                         self._train_writer.add_summary(train_summary, global_steps)
                         if self._run_tests:
                             test_score = self.test(self._session, self.test_episodes_per_epoch)

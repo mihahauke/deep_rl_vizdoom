@@ -93,4 +93,5 @@ tmp
 _vizdoom.ini
 models
 logs
+erlogs
 clear_logs.sh

@@ -23,7 +23,7 @@ class VizdoomWrapper():
 
         if ignore_misc:
             pass
-            #TODO implement misc support
+            # TODO implement misc support
         if last_action_input:
             # TODO
             raise NotImplementedError("Last_action_input support not implemented yet.")
@@ -32,24 +32,27 @@ class VizdoomWrapper():
         if use_freedoom:
             doom.set_doom_game_path(vzd.__path__[0] + "/freedoom2.wad")
         self.doom = doom
-        doom.load_config(os.path.join(scenarios_path,str(config_file)))
+        doom.load_config(os.path.join(scenarios_path, str(config_file)))
         doom.set_window_visible(display)
+        # TODO support for colors
         doom.set_screen_format(vzd.ScreenFormat.GRAY8)
         doom.set_screen_resolution(vzd.ScreenResolution.RES_160X120)
         if not noinit:
             doom.init()
-
         self._stack_n_frames = stack_n_frames
         self._resolution = resolution
         self._frame_skip = frame_skip
         self._reward_scale = reward_scale
 
+        self._img_channels = stack_n_frames
+        self._img_shape = (resolution[0], resolution[1], stack_n_frames)
         self._actions = [list(a) for a in it.product([0, 1], repeat=doom.get_available_buttons_size())]
         self.actions_num = len(self._actions)
         self._current_screen = None
-        self._current_stacked_screen = None
+        self._current_stacked_screen = np.zeros(self._img_shape, dtype=np.float32)
         self._last_reward = None
         self._terminal = None
+
         if not noinit:
             self.reset()
 
@@ -69,16 +72,17 @@ class VizdoomWrapper():
         self._set_current_screen()
         self._last_reward = 0
         self._terminal = False
-        self._current_stacked_screen = np.stack(self._stack_n_frames * [self._current_screen[:, :, 0]], axis=2)
+        self._current_stacked_screen.fill(0)
+        self._current_stacked_screen[:, :, -1] = self._current_screen[:, :, 0]
 
     def make_action(self, action_index):
         action = self._actions[action_index]
-        # TODO some scaling?
         self._last_reward = self.doom.make_action(action, self._frame_skip) * self._reward_scale
         self._terminal = self.doom.is_episode_finished()
 
         if not self._terminal:
             self._set_current_screen()
+            # TODO check how efficient it is
             self._current_stacked_screen = np.append(self._current_stacked_screen[:, :, 1:], self._current_screen,
                                                      axis=2)
 

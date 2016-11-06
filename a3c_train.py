@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+from __future__ import print_function
 import json
 from util.parsers import parse_train_a3c_args
+from skimage import io
 import os
 
 
@@ -42,26 +43,30 @@ def train_a3c(settings, args):
     session = tf.Session(config=config)
 
     init = tf.initialize_all_variables()
+    print("Initializing variables...")
     session.run(init)
-
+    print("Initializing finished.")
     global_steps_counter = ThreadsafeCounter()
 
+    print("Launching training.")
     for l in actor_learners:
         l.run_training(session=session, global_steps_counter=global_steps_counter)
 
 
 if __name__ == "__main__":
+    #TODO print setup info on stderr and stdout
+    args = parse_train_a3c_args()
+    # TODO override settings according to args
+
     default_settings_filepath = "settings/defaults.json"
-    override_settings_filepath = "settings/basic.json"
+    override_settings_filepath = "settings/predict_position.json"
     a3c_settings = json.load(file(default_settings_filepath))
     override_settings = json.load(file(override_settings_filepath))
     a3c_settings.update(override_settings)
-
-    args = parse_train_a3c_args()
-    # TODO override settings according to args
 
     if not os.path.isdir(a3c_settings["models_path"]):
         os.makedirs(a3c_settings["models_path"])
     if not os.path.isdir(a3c_settings["logdir"]):
         os.makedirs(a3c_settings["logdir"])
+
     train_a3c(a3c_settings, args)
