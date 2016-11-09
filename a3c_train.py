@@ -59,7 +59,7 @@ if __name__ == "__main__":
     # TODO override settings according to args
 
     default_settings_filepath = "settings/defaults.json"
-    override_settings_filepath = "settings/defend_the_center.json"
+    override_settings_filepath = "settings/basic.json"
     a3c_settings = json.load(file(default_settings_filepath))
     override_settings = json.load(file(override_settings_filepath))
     a3c_settings.update(override_settings)

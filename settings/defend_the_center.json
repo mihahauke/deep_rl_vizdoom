@@ -18,7 +18,7 @@
   "max_remembered_steps": 5,
   "gamma": 0.99,
   "epochs": "Inf",
-  "local_steps_per_epoch": 5000,
+  "local_steps_per_epoch": 20000,
   "test_episodes_per_epoch": 100,
   "entropy_beta": 0.01,
   "frame_skip": 4,

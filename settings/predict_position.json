@@ -1,11 +1,12 @@
 {
   "config_file": "predict_position.cfg",
+  "scenarios_path:":"/home/ebony/benchmark_scenarios",
   "base_tag": "predict_position/",
   "run_tag": null,
   "display": false,
   "use_freedoom": false,
   "threads_num": 16,
-  "network_type": "ff",
+  "network_type": "lstm",
   "device": "/gpu:0",
   "test_episodes": 100,
   "resolution": [
