@@ -6,7 +6,7 @@
   "display": false,
   "use_freedoom": false,
   "threads_num": 16,
-  "network_type": "lstm",
+  "network_type": "lstm_ac",
   "device": "/gpu:0",
   "test_episodes": 100,
   "resolution": [

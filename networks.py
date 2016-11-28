@@ -3,6 +3,7 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.contrib.layers import convolution2d, fully_connected, flatten
 from tensorflow.python.ops.rnn_cell import LSTMStateTuple
+
 from util import Record
 import inspect
 import sys
@@ -109,11 +110,11 @@ class _BaseACNet(object):
         return conv3_flat
 
 
-class FFNet(_BaseACNet):
+class FFACNet(_BaseACNet):
     def __init__(self,
                  **kwargs):
         self._name_scope = "a3c_ff_net"
-        super(FFNet, self).__init__(**kwargs)
+        super(FFACNet, self).__init__(**kwargs)
 
     def create_architecture(self, **specs):
         with tf.device(self._device):
@@ -243,20 +244,20 @@ class _BaseRcurrentNet(_BaseACNet):
         return True
 
 
-class BasicLstmNet(_BaseRcurrentNet):
+class BasicLstmACNet(_BaseRcurrentNet):
     def __init__(self,
                  **settings
                  ):
         self._name_scope = "a3c_basic_lstm_net"
-        super(BasicLstmNet, self).__init__(tf.nn.rnn_cell.BasicLSTMCell, **settings)
+        super(BasicLstmACNet, self).__init__(tf.nn.rnn_cell.BasicLSTMCell, **settings)
 
 
-class LstmNet(_BaseRcurrentNet):
+class LstmACNet(_BaseRcurrentNet):
     def __init__(self,
                  **settings
                  ):
         self._name_scope = "a3c_lstm_net"
-        super(LstmNet, self).__init__(tf.nn.rnn_cell.LSTMCell, **settings)
+        super(LstmACNet, self).__init__(tf.nn.rnn_cell.LSTMCell, **settings)
 
 
 # TODO make a module and move this methods somewhere else?
@@ -271,11 +272,9 @@ def get_available_networks():
     return nets
 
 
-_short_names = {FFNet: "ff", BasicLstmNet: "basic_lstm", LstmNet: "lstm"}
-_inv_short_names = {v: k for k, v in _short_names.iteritems()}
-
-
-def create_network(network_type, **args):
+def create_ac_network(network_type, **args):
+    _short_names = {FFACNet: "ff_ac", BasicLstmACNet: "basic_lstm_ac", LstmACNet: "lstm_ac"}
+    _inv_short_names = {v: k for k, v in _short_names.iteritems()}
     if network_type is not None:
         for mname, mclass in get_available_networks():
             if network_type == mname:

@@ -6,7 +6,7 @@ import numpy as np
 import random
 import time
 from vizdoom_wrapper import VizdoomWrapper
-from networks import create_network
+from networks import create_ac_network
 from tqdm import trange
 from threading import Thread
 from util.coloring import red, green, blue
@@ -24,7 +24,7 @@ class ActorLearner(Thread):
                  **settings):
         super(ActorLearner, self).__init__()
 
-        print("Spawning actor-learner #{}.".format(thread_index))
+        print("Creating actor-learner #{}.".format(thread_index))
         self.index = thread_index
         self._settings = settings
         date_string = strftime("%d.%m.%y-%H:%M")
@@ -41,7 +41,7 @@ class ActorLearner(Thread):
         self.doom_wrapper = VizdoomWrapper(**settings)
         self.actions_num = self.doom_wrapper.actions_num
 
-        self.local_network = create_network(actions_num=self.actions_num, thread=thread_index, **settings)
+        self.local_network = create_ac_network(actions_num=self.actions_num, thread=thread_index, **settings)
 
         # TODO check gate_gradients != Optimizer.GATE_OP
         grads_and_vars = optimizer.compute_gradients(self.local_network.ops.loss,

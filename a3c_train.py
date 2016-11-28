@@ -10,12 +10,12 @@ def train_a3c(settings, args):
     import tensorflow as tf
     from actor_learner import ActorLearner
     from vizdoom_wrapper import VizdoomWrapper
-    from networks import create_network
+    from networks import create_ac_network
     from util import ThreadsafeCounter
     from util.optimizers import ClippingRMSPropOptimizer
 
     actions_num = VizdoomWrapper(noinit=True, **settings).actions_num
-    global_network = create_network(actions_num=actions_num, **settings)
+    global_network = create_ac_network(actions_num=actions_num, **settings)
 
     # This global step counts gradient applications not performed actions.
     with tf.name_scope("global"):
@@ -50,8 +50,8 @@ def train_a3c(settings, args):
     print("Launching training.")
     for l in actor_learners:
         l.run_training(session=session, global_steps_counter=global_steps_counter)
-
-
+    for l in actor_learners:
+        l.join()
 if __name__ == "__main__":
     # TODO make tqdm work when stderr is redirected
     # TODO print setup info on stderr and stdout
@@ -70,3 +70,4 @@ if __name__ == "__main__":
         os.makedirs(a3c_settings["logdir"])
 
     train_a3c(a3c_settings, args)
+
