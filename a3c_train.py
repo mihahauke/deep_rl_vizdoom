@@ -6,7 +6,7 @@ from util.parsers import parse_train_a3c_args
 import os
 
 
-def train_a3c(settings, args):
+def train_a3c(settings):
     import tensorflow as tf
     from actor_learner import ActorLearner
     from vizdoom_wrapper import VizdoomWrapper
@@ -59,7 +59,7 @@ if __name__ == "__main__":
     # TODO override settings according to args
 
     default_settings_filepath = "settings/defaults.json"
-    override_settings_filepath = "settings/basic.json"
+    override_settings_filepath = args.settings_json
     a3c_settings = json.load(file(default_settings_filepath))
     override_settings = json.load(file(override_settings_filepath))
     a3c_settings.update(override_settings)
@@ -69,5 +69,5 @@ if __name__ == "__main__":
     if not os.path.isdir(a3c_settings["logdir"]):
         os.makedirs(a3c_settings["logdir"])
 
-    train_a3c(a3c_settings, args)
+    train_a3c(a3c_settings)
 

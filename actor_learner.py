@@ -93,6 +93,8 @@ class ActorLearner(Thread):
         actions = []
         rewards = []
         values = []
+        advantages = []
+        Rs = []
 
         terminal_end = False
 
@@ -103,18 +105,14 @@ class ActorLearner(Thread):
 
         start_local_steps = self.local_steps
 
-        iteration = 0
-        while True:
-            if iteration >= self.max_remembered_steps:
-                break
-            iteration += 1
+        for _ in range(self.max_remembered_steps):
             current_state = self.doom_wrapper.get_current_state()
             policy, state_value = self.local_network.get_policy_and_value(self._session, current_state)
             action_index = ActorLearner.choose_action_index(policy)
-            states.insert(0, current_state)
-            actions.insert(0, action_index)
             values.insert(0, state_value)
-
+            states.append(current_state)
+            actions.append(np.zeros([self.actions_num]))
+            actions[-1][action_index] = 1
             reward = self.doom_wrapper.make_action(action_index)
             terminal = self.doom_wrapper.is_terminal()
 
@@ -130,44 +128,33 @@ class ActorLearner(Thread):
                     self.local_network.reset_state()
                 break
 
-        R = 0.0
-        if not terminal_end:
+        if terminal_end:
+            R = 0.0
+        else:
             R = self.local_network.get_value(self._session, self.doom_wrapper.get_current_state())
 
-        batch_s = []
-        batch_a = []
-        batch_td = []
-        batch_R = []
-
-        # TODO try to make it more efficient
-        for (ai, ri, s, Vi) in zip(actions, rewards, states, values):
+        for ri, Vi in zip(rewards, values):
             R = ri + self.gamma * R
-            td = R - Vi
-            a = np.zeros([self.actions_num])
-            a[ai] = 1
-
-            batch_s.insert(0, s)
-            batch_a.insert(0, a)
-            batch_td.insert(0, td)
-            batch_R.insert(0, R)
+            advantages.insert(0, R - Vi)
+            Rs.insert(0, R)
 
         train_op_feed_dict = {
-            self.local_network.vars.state: batch_s,
-            self.local_network.vars.a: batch_a,
-            self.local_network.vars.td: batch_td,
-            self.local_network.vars.r: batch_R
+            self.local_network.vars.state: states,
+            self.local_network.vars.a: actions,
+            self.local_network.vars.td: advantages,
+            self.local_network.vars.R: Rs
         }
 
         if self.local_network.has_state():
             train_op_feed_dict[self.local_network.vars.initial_network_state] = initial_network_state
-            train_op_feed_dict[self.local_network.vars.sequence_length] = [len(batch_a)]
+            train_op_feed_dict[self.local_network.vars.sequence_length] = [len(actions)]
 
         self._session.run(self.train_op, feed_dict=train_op_feed_dict)
         steps_performed = self.local_steps - start_local_steps
 
         return steps_performed
 
-    def test(self, sess, episodes):
+    def test(self, sess):
         test_start_time = time.time()
         test_rewards = []
         for _ in trange(self.test_episodes_per_epoch):

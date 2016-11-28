@@ -59,8 +59,8 @@ class _BaseACNet(object):
     def _prepare_loss_op(self):
         with tf.device(self._device):
             self.vars.a = tf.placeholder(tf.float32, [None, self._actions_num])
-            self.vars.td = tf.placeholder(tf.float32, [None])
-            self.vars.r = tf.placeholder(tf.float32, [None])
+            self.vars.advantage = tf.placeholder(tf.float32, [None])
+            self.vars.R = tf.placeholder(tf.float32, [None])
 
             log_pi = tf.log(tf.clip_by_value(self.ops.pi, 1e-20, 1.0))
             entropy = -tf.reduce_sum(self.ops.pi * log_pi, reduction_indices=1)
@@ -68,9 +68,9 @@ class _BaseACNet(object):
             # TODO maybe dacay entropy_beta?
             policy_loss = - tf.reduce_sum(
                 tf.reduce_sum(tf.mul(log_pi, self.vars.a),
-                              reduction_indices=1) * self.vars.td + entropy * self._entropy_beta)
+                              reduction_indices=1) * self.vars.advantage + entropy * self._entropy_beta)
 
-            value_loss = 0.5 * tf.nn.l2_loss(self.vars.r - self.ops.v)
+            value_loss = 0.5 * tf.nn.l2_loss(self.vars.R - self.ops.v)
 
             self.ops.loss = policy_loss + value_loss
 
