@@ -25,6 +25,7 @@ class ClippingRMSPropOptimizer(tf.train.RMSPropOptimizer):
                           aggregation_method=None,
                           colocate_gradients_with_ops=False,
                           grad_loss=None):
+
         grads_and_vars = super(ClippingRMSPropOptimizer, self).compute_gradients(loss, var_list=var_list,
                                                                                  gate_gradients=gate_gradients,
                                                                                  aggregation_method=aggregation_method,
@@ -34,10 +35,7 @@ class ClippingRMSPropOptimizer(tf.train.RMSPropOptimizer):
             grads_and_vars = [(tf.clip_by_norm(grad, self._clip_norm), var) for grad, var in grads_and_vars]
         return grads_and_vars
 
-    def _apply_dense(self, grad, var):
-        """'Implemented' for the sake of PyCharm Warnings"""
-        return super(ClippingRMSPropOptimizer, self)._apply_dense(grad, var)
 
-    def _apply_sparse(self, grad, var):
-        """'Implemented' for the sake of PyCharm Warnings"""
-        return super(ClippingRMSPropOptimizer, self)._apply_sparse(grad, var)
+class DQNRMSPropOptimizer(tf.train.RMSPropOptimizer):
+    def __init__(self, **kwargs):
+        super(DQNRMSPropOptimizer, self).__init__(**kwargs)

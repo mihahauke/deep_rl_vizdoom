@@ -1,6 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-from __future__ import print_function
 import json
 from util.parsers import parse_train_a3c_args
 import os
@@ -20,6 +19,7 @@ def train_a3c(settings):
     # This global step counts gradient applications not performed actions.
     with tf.name_scope("global"):
         with tf.device(settings["device"]):
+            # TODO remove this with default tf.train.global_step
             global_train_step = tf.Variable(0, trainable=False, name="GlobalStep")
             global_learning_rate = tf.train.polynomial_decay(
                 learning_rate=settings["initial_learning_rate"],
@@ -41,9 +41,8 @@ def train_a3c(settings):
     config.gpu_options.allow_growth = True
     session = tf.Session(config=config)
 
-    init = tf.initialize_all_variables()
     print("Initializing variables...")
-    session.run(init)
+    session.run(tf.global_variables_initializer())
     print("Initializing finished.")
     global_steps_counter = ThreadsafeCounter()
 
@@ -58,10 +57,10 @@ if __name__ == "__main__":
     args = parse_train_a3c_args()
     # TODO override settings according to args
 
-    default_settings_filepath = "settings/defaults.json"
+    default_settings_filepath = "settings/a3c/defaults.json"
     override_settings_filepath = args.settings_json
-    a3c_settings = json.load(file(default_settings_filepath))
-    override_settings = json.load(file(override_settings_filepath))
+    a3c_settings = json.load(open(default_settings_filepath))
+    override_settings = json.load(open(override_settings_filepath))
     a3c_settings.update(override_settings)
 
     if not os.path.isdir(a3c_settings["models_path"]):

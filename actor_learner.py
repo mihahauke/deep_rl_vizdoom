@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import print_function
 from vizdoom import SignalException, ViZDoomUnexpectedExitException
 from util import sec_to_str, threadsafe_print
 import numpy as np
@@ -21,11 +20,13 @@ class ActorLearner(Thread):
                  # TODO somehow move global train step somewhere else
                  global_train_step,
                  optimizer,
+                 write_summaries=True,
                  **settings):
         super(ActorLearner, self).__init__()
 
         print("Creating actor-learner #{}.".format(thread_index))
         self.index = thread_index
+        self.write_summaries = write_summaries
         self._settings = settings
         date_string = strftime("%d.%m.%y-%H:%M")
         self._run_string = "{}/{}_{}/{}".format(settings["base_tag"], settings["network_type"], settings["threads_num"],
@@ -58,16 +59,17 @@ class ActorLearner(Thread):
 
         self._train_writer = None
         self._test_writer = None
+        self._summaries = None
+
         if self.index == 0:
             self._model_savefile = settings["models_path"] + "/" + self._run_string
-            self.test_score = tf.placeholder(tf.float32)
-            self.score_summary = tf.placeholder(tf.float32)
-            tf.scalar_summary(self._run_string + "/score", self.score_summary)
-            self._summaries = tf.merge_all_summaries()
+            if self.write_summaries:
+                self.test_score = tf.placeholder(tf.float32)
+                self.score_summary = tf.placeholder(tf.float32)
+                tf.scalar_summary(self._run_string + "/score", self.score_summary)
+                self._summaries = tf.merge_all_summaries()
         else:
             self._model_savefile = None
-
-            self._summaries = None
 
         self._saver = None
         self._session = None
@@ -141,7 +143,7 @@ class ActorLearner(Thread):
         train_op_feed_dict = {
             self.local_network.vars.state: states,
             self.local_network.vars.a: actions,
-            self.local_network.vars.td: advantages,
+            self.local_network.vars.advantage: advantages,
             self.local_network.vars.R: Rs
         }
 
@@ -203,7 +205,7 @@ class ActorLearner(Thread):
         print(
             "TRAIN: mean: {}, min: {}, max:{}, "
             "GlobalSteps: {}, LocalSpd: {:.0f} STEPS/s GlobalSpd: "
-            "{} STEPS/s, {:.2f}M STEPS/hour, overall time: {}".format(
+            "{} STEPS/s, {:.2f}M STEPS/hour, total elapsed time: {}".format(
                 green("{:0.3f}±{:0.2f}".format(mean_score, score_std)),
                 red("{:0.3f}".format(min_score)),
                 blue("{:0.3f}".format(max_score)),
@@ -234,15 +236,19 @@ class ActorLearner(Thread):
                         mean_train_scre = np.mean(self.train_scores)
                         self.train_scores = []
 
-                        train_summary = self._session.run(self._summaries, {self.score_summary: mean_train_scre})
-                        self._train_writer.add_summary(train_summary, global_steps)
                         if self._run_tests:
-                            test_score = self.test(self._session, self.test_episodes_per_epoch)
-                            test_summary = self._session.run(self._summaries, {self.score_summary: test_score})
-                            self._test_writer.add_summary(test_summary, global_steps)
+                            test_score = self.test(self._session)
 
-                    last_log_time = time.time()
-                    local_steps_for_log = 0
+                        if self.write_summaries:
+                            train_summary = self._session.run(self._summaries, {self.score_summary: mean_train_scre})
+                            self._train_writer.add_summary(train_summary, global_steps)
+                            if self._run_tests:
+                                test_summary = self._session.run(self._summaries, {self.score_summary: test_score})
+                                self._test_writer.add_summary(test_summary, global_steps)
+
+                        last_log_time = time.time()
+                        local_steps_for_log = 0
+                        print()
 
         except (SignalException, ViZDoomUnexpectedExitException):
             threadsafe_print(red("Thread #{} aborting(ViZDoom killed).".format(self.index)))

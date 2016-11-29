@@ -17,6 +17,7 @@ class _BaseACNet(object):
                  stack_n_frames=4,
                  thread="global",
                  entropy_beta=0.01,
+                 # TODO dafuq is that?
                  only_params=False,
                  **kwargs):
         # TODO make only_params work
@@ -40,7 +41,7 @@ class _BaseACNet(object):
 
         self.create_architecture()
         self._prepare_loss_op()
-        self._params = tf.get_collection(tf.GraphKeys.VARIABLES, scope=self._name_scope)
+        self._params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self._name_scope)
 
     def _sync_op(self, src_network, name=None):
         src_vars = src_network.get_params()
@@ -64,13 +65,14 @@ class _BaseACNet(object):
 
             log_pi = tf.log(tf.clip_by_value(self.ops.pi, 1e-20, 1.0))
             entropy = -tf.reduce_sum(self.ops.pi * log_pi, reduction_indices=1)
-
             # TODO maybe dacay entropy_beta?
+            # TODO is this tf.mul really needed?
             policy_loss = - tf.reduce_sum(
                 tf.reduce_sum(tf.mul(log_pi, self.vars.a),
                               reduction_indices=1) * self.vars.advantage + entropy * self._entropy_beta)
 
-            value_loss = 0.5 * tf.nn.l2_loss(self.vars.R - self.ops.v)
+            # TODO is further division by 2 needed?
+            value_loss = tf.nn.l2_loss(self.vars.R - self.ops.v)
 
             self.ops.loss = policy_loss + value_loss
 
@@ -274,7 +276,7 @@ def get_available_networks():
 
 def create_ac_network(network_type, **args):
     _short_names = {FFACNet: "ff_ac", BasicLstmACNet: "basic_lstm_ac", LstmACNet: "lstm_ac"}
-    _inv_short_names = {v: k for k, v in _short_names.iteritems()}
+    _inv_short_names = {v: k for k, v in _short_names.items()}
     if network_type is not None:
         for mname, mclass in get_available_networks():
             if network_type == mname:
