@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 import json
 from util.parsers import parse_train_a3c_args
+from util.coloring import green
+
 import os
 
 
@@ -13,8 +15,11 @@ def train_a3c(settings):
     from util import ThreadsafeCounter
     from util.optimizers import ClippingRMSPropOptimizer
 
-    actions_num = VizdoomWrapper(noinit=True, **settings).actions_num
-    global_network = create_ac_network(actions_num=actions_num, **settings)
+    tmpVizdoomWrapper = VizdoomWrapper(noinit=True, **settings)
+    actions_num = tmpVizdoomWrapper.actions_num
+    misc_len = tmpVizdoomWrapper.misc_len
+    tmpVizdoomWrapper = None
+    global_network = create_ac_network(actions_num=actions_num, misc_len=misc_len, **settings)
 
     # This global step counts gradient applications not performed actions.
     with tf.name_scope("global"):
@@ -43,14 +48,16 @@ def train_a3c(settings):
 
     print("Initializing variables...")
     session.run(tf.global_variables_initializer())
-    print("Initializing finished.")
+    print("Initialization finished.")
     global_steps_counter = ThreadsafeCounter()
 
-    print("Launching training.")
+    print(green("Launching training."))
     for l in actor_learners:
         l.run_training(session=session, global_steps_counter=global_steps_counter)
     for l in actor_learners:
         l.join()
+
+
 if __name__ == "__main__":
     # TODO make tqdm work when stderr is redirected
     # TODO print setup info on stderr and stdout
@@ -69,4 +76,3 @@ if __name__ == "__main__":
         os.makedirs(a3c_settings["logdir"])
 
     train_a3c(a3c_settings)
-

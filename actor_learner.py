@@ -17,7 +17,7 @@ class ActorLearner(Thread):
     def __init__(self,
                  thread_index,
                  global_network,
-                 # TODO somehow move global train step somewhere else
+                 # TODO somehow move global train step somewhere else (tf 12 enables it now)
                  global_train_step,
                  optimizer,
                  write_summaries=True,
@@ -40,9 +40,13 @@ class ActorLearner(Thread):
         self.gamma = np.float32(settings["gamma"])
 
         self.doom_wrapper = VizdoomWrapper(**settings)
+        misc_len = self.doom_wrapper.misc_len
+        self.use_misc = self.doom_wrapper.use_misc
+
         self.actions_num = self.doom_wrapper.actions_num
 
-        self.local_network = create_ac_network(actions_num=self.actions_num, thread=thread_index, **settings)
+        self.local_network = create_ac_network(actions_num=self.actions_num, thread=thread_index, misc_len=misc_len,
+                                               **settings)
 
         # TODO check gate_gradients != Optimizer.GATE_OP
         grads_and_vars = optimizer.compute_gradients(self.local_network.ops.loss,
@@ -91,7 +95,8 @@ class ActorLearner(Thread):
         return len(policy) - 1
 
     def make_training_step(self):
-        states = []
+        states_img = []
+        states_misc = []
         actions = []
         rewards = []
         values = []
@@ -102,17 +107,19 @@ class ActorLearner(Thread):
 
         self._session.run(self.sync_op)
 
+        initial_network_state = None
         if self.local_network.has_state():
             initial_network_state = self.local_network.get_current_network_state()
 
-        start_local_steps = self.local_steps
-
+        steps_performed = 0
         for _ in range(self.max_remembered_steps):
-            current_state = self.doom_wrapper.get_current_state()
-            policy, state_value = self.local_network.get_policy_and_value(self._session, current_state)
+            steps_performed += 1
+            current_img, current_misc = self.doom_wrapper.get_current_state()
+            policy, state_value = self.local_network.get_policy_and_value(self._session, [current_img, current_misc])
             action_index = ActorLearner.choose_action_index(policy)
             values.insert(0, state_value)
-            states.append(current_state)
+            states_img.append(current_img)
+            states_misc.append(current_misc)
             actions.append(np.zeros([self.actions_num]))
             actions[-1][action_index] = 1
             reward = self.doom_wrapper.make_action(action_index)
@@ -129,7 +136,6 @@ class ActorLearner(Thread):
                 if self.local_network.has_state():
                     self.local_network.reset_state()
                 break
-
         if terminal_end:
             R = 0.0
         else:
@@ -141,18 +147,19 @@ class ActorLearner(Thread):
             Rs.insert(0, R)
 
         train_op_feed_dict = {
-            self.local_network.vars.state: states,
+            self.local_network.vars.state_img: states_img,
             self.local_network.vars.a: actions,
             self.local_network.vars.advantage: advantages,
             self.local_network.vars.R: Rs
         }
+        if self.use_misc:
+            train_op_feed_dict[self.local_network.vars.state_misc] = states_misc
 
         if self.local_network.has_state():
             train_op_feed_dict[self.local_network.vars.initial_network_state] = initial_network_state
             train_op_feed_dict[self.local_network.vars.sequence_length] = [len(actions)]
 
         self._session.run(self.train_op, feed_dict=train_op_feed_dict)
-        steps_performed = self.local_steps - start_local_steps
 
         return steps_performed
 
@@ -236,6 +243,7 @@ class ActorLearner(Thread):
                         mean_train_scre = np.mean(self.train_scores)
                         self.train_scores = []
 
+                        test_score = None
                         if self._run_tests:
                             test_score = self.test(self._session)
 

@@ -18,13 +18,11 @@ class VizdoomWrapper():
                  noinit=False,
                  use_freedoom=False,
                  last_action_input=False,
-                 ignore_misc=False,
+                 use_misc=True,
+                 misc_scale=None,
                  scenarios_path=os.path.join(vzd.__path__[0], "scenarios"),
                  **kwargs):
 
-        if ignore_misc:
-            pass
-            # TODO implement misc support
         if last_action_input:
             # TODO
             raise NotImplementedError("Last_action_input support not implemented yet.")
@@ -40,6 +38,7 @@ class VizdoomWrapper():
         doom.set_screen_resolution(vzd.ScreenResolution.RES_160X120)
         if not noinit:
             doom.init()
+
         self._stack_n_frames = stack_n_frames
         self._resolution = resolution
         self._frame_skip = frame_skip
@@ -54,11 +53,27 @@ class VizdoomWrapper():
         self._last_reward = None
         self._terminal = None
 
+        self.misc_len = self.doom.get_available_game_variables_size() if use_misc else 0
+        self.use_misc = use_misc and self.misc_len > 0
+
+        self._current_misc = None
+        self._current_stacked_misc = None
+        self.misc_scale = None
+        if self.use_misc:
+            if misc_scale:
+                self.misc_scale = np.float32(misc_scale)
+            self._current_stacked_misc = np.zeros(self.misc_len * self._stack_n_frames, dtype=np.float32)
+
         if not noinit:
             self.reset()
 
     def _set_current_screen(self):
         self._current_screen = self.preprocess(self.doom.get_state().screen_buffer)
+
+    def _set_current_misc(self):
+        self._current_misc = self.doom.get_state().game_variables
+        if self.misc_scale:
+            self._current_misc *= self.misc_scale
 
     def preprocess(self, img):
         img = skimage.transform.resize(img, self._resolution)
@@ -70,11 +85,17 @@ class VizdoomWrapper():
     def reset(self):
         self.doom.new_episode()
 
-        self._set_current_screen()
         self._last_reward = 0
         self._terminal = False
+
+        self._set_current_screen()
         self._current_stacked_screen.fill(0)
+        # self._current_screen.shape is (84,84,1)
         self._current_stacked_screen[:, :, -1] = self._current_screen[:, :, 0]
+        if self.use_misc:
+            self._set_current_misc()
+            self._current_stacked_misc.fill(0)
+            self._current_stacked_misc[-self.misc_len:] = self._current_misc
 
     def make_action(self, action_index):
         action = self._actions[action_index]
@@ -86,11 +107,15 @@ class VizdoomWrapper():
             # TODO check how efficient it is
             self._current_stacked_screen = np.append(self._current_stacked_screen[:, :, 1:], self._current_screen,
                                                      axis=2)
+            if self.use_misc:
+                self._set_current_misc()
+                self._current_stacked_misc = np.append(self._current_stacked_misc[self.misc_len:],
+                                                       self._current_misc)
 
         return self._last_reward
 
     def get_current_state(self):
-        return self._current_stacked_screen
+        return self._current_stacked_screen, self._current_stacked_misc
 
     def get_total_reward(self):
         return self.doom.get_total_reward() * self._reward_scale
