@@ -1,33 +1,7 @@
 {
   "config_file": "basic.cfg",
   "base_tag": "basic",
-  "run_tag": null,
-  "display": false,
   "threads_num": 8,
   "network_type": "lstm_ac",
-  "device": "/gpu:0",
-  "test_episodes": 100,
-  "resolution": [
-    84,
-    84
-  ],
-  "stack_n_frames": 4,
-  "initial_learning_rate": 0.0007,
-  "final_learning_rate": 0.00001,
-  "learning_rate_decay_steps": 10e07,
-  "max_remembered_steps": 5,
-  "gamma": 0.99,
-  "epochs": "Inf",
-  "local_steps_per_epoch": 1000,
-  "test_episodes_per_epoch": 100,
-  "entropy_beta": 0.01,
-  "frame_skip": 4,
-  "reward_scale": 0.01,
-  "rmsprop": {
-    "epsilon": 0.1,
-    "decay": 0.99,
-    "momentum": 0.0,
-    "clip_norm": 0.0
-  },
-  "run_tests": true
+  "run_tests": false
 }
