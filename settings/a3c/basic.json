@@ -3,5 +3,7 @@
   "base_tag": "basic",
   "threads_num": 8,
   "network_type": "lstm_ac",
-  "run_tests": false
+  "run_tests": false,
+  "use_misc": true,
+  "misc_scale": [0.02]
 }

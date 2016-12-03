@@ -69,7 +69,6 @@ if __name__ == "__main__":
     a3c_settings = json.load(open(default_settings_filepath))
     override_settings = json.load(open(override_settings_filepath))
     a3c_settings.update(override_settings)
-
     if not os.path.isdir(a3c_settings["models_path"]):
         os.makedirs(a3c_settings["models_path"])
     if not os.path.isdir(a3c_settings["logdir"]):

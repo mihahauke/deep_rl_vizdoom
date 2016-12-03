@@ -1,10 +1,10 @@
 {
   "config_file": "health_gathering.cfg",
-  "scenarios_path:":"/home/ebony/benchmark_scenarios",
+  "scenarios_path": "../benchmark_scenarios/scenarios",
   "base_tag": "healthg/",
   "run_tag": null,
   "threads_num": 16,
-  "network_type": "ff_ac",
+  "network_type": "lstm_ac",
   "run_tests": false,
   "local_steps_per_epoch": 10000,
   "frame_skip": 10,

@@ -166,7 +166,7 @@ class ActorLearner(Thread):
     def test(self, sess):
         test_start_time = time.time()
         test_rewards = []
-        for _ in trange(self.test_episodes_per_epoch):
+        for _ in trange(self.test_episodes_per_epoch, leave=False):
             self.doom_wrapper.reset()
             if self.local_network.has_state():
                 self.local_network.reset_state()

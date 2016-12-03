@@ -1,10 +1,17 @@
 {
   "config_file": "pacman.cfg",
-  "scenarios_path:":"/home/ebony/benchmark_scenarios",
-  "base_tag": "predict_position/",
+  "scenarios_path": "../benchmark_scenarios/scenarios",
+  "base_tag": "pacman/",
   "run_tag": null,
   "threads_num": 16,
   "network_type": "lstm_ac",
-  "run_tests": false
+  "run_tests": false,
   "local_steps_per_epoch": 10000,
+  "rmsprop": {
+    "epsilon": 0.1,
+    "decay": 0.99,
+    "momentum": 0.0,
+    "clip_norm": 0.0
+  },
+  "reward_scale": 1.0
 }

@@ -21,7 +21,7 @@ class _BaseACNet(object):
                  device="/gpu:0",
                  **ignored):
         self._name_scope = self._get_name_scope() + "_" + str(thread)
-        self._misc_len = misc_len * stack_n_frames
+        self._misc_len = misc_len
         self._resolution = resolution
         self._stack_n_frames = stack_n_frames
         self._device = device
