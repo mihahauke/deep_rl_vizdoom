@@ -2,9 +2,8 @@
 import numpy as np
 import itertools as it
 import vizdoom as vzd
-import skimage.transform
 import os
-from util import threadsafe_print
+import cv2
 
 
 class VizdoomWrapper():
@@ -76,13 +75,11 @@ class VizdoomWrapper():
         if not noinit:
             self.reset()
 
-    # # TODO efficiency?
     def _update_screen(self):
         self._current_screen = self.preprocess(self.doom.get_state().screen_buffer)
         self._current_stacked_screen = np.append(self._current_stacked_screen[:, :, 1:], self._current_screen,
                                                  axis=2)
 
-    # TODO efficiency?
     def _update_misc(self):
         game_vars = self.doom.get_state().game_variables
         if self.misc_scale:
@@ -95,8 +92,11 @@ class VizdoomWrapper():
             self._current_stacked_misc[-len(self.last_n_actions):] = self.last_n_actions
 
     def preprocess(self, img):
-        img = skimage.transform.resize(img, self._resolution)
-        img = img.astype(np.float32)
+        # TODO check what's the difference in practice
+        # img = cv2.resize(img, self._resolution, interpolation=cv2.INTER_CUBIC)
+        # img = cv2.resize(img, self._resolution, interpolation=cv2.INTER_NEAREST)
+        img = cv2.resize(img, self._resolution, interpolation=cv2.INTER_LINEAR)
+        img = img.astype(np.float32)/255.0
         # TODO somehow get rid of this reshape
         img = img.reshape(list(self._resolution) + [1])
         return img

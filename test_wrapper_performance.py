@@ -42,10 +42,11 @@ def measure(name, iters=5000, **settings):
     doom.init()
     actions = [list(a) for a in it.product([0, 1], repeat=len(doom.get_available_game_variables()))]
     start = time()
+    frame_skip = settings["frame_skip"]
     for _ in trange(iters, leave=False):
         if doom.is_episode_finished():
             doom.new_episode()
-        doom.make_action(choice(actions))
+        doom.make_action(choice(actions), frame_skip)
 
     end = time()
     vanilla_t = end - start
@@ -80,7 +81,7 @@ pacman_full = {"config_file": "pacman.cfg",
                "frame_skip": 10, "stack_n_frames": 4,
                "input_n_last_actions": 4,
                "use_misc": True,
-               "scenarios_path": "../benchmark_scenarios/scenarios"
+               "scenarios_path": "../benchmark_scenarios/scenarios",
                }
 pacman_min = {"config_file": "pacman.cfg",
               "frame_skip": 10, "stack_n_frames": 1,
@@ -89,9 +90,9 @@ pacman_min = {"config_file": "pacman.cfg",
               "scenarios_path": "../benchmark_scenarios/scenarios"
               }
 
+measure("PACMAN_FULL", **pacman_full)
+measure("PACMAN_MIN", **pacman_min)
 measure("HG_FULL", **hg_full)
 measure("HG_MINIMAL", **hg_min)
 measure("HG_NO_SKIP", **hg_no_skip)
 measure("HG_HIGHRES", **hg_highres)
-measure("PACMAN_FULL", **pacman_full)
-measure("PACMAN_MIN", **pacman_min)
