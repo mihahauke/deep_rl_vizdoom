@@ -11,7 +11,7 @@ class VizdoomWrapper():
                  config_file,
                  frame_skip,
                  display=False,
-                 resolution=(84, 84),
+                 resolution=(80, 60),
                  stack_n_frames=4,
                  reward_scale=1.0,
                  noinit=False,
@@ -35,7 +35,8 @@ class VizdoomWrapper():
             doom.init()
 
         self._stack_n_frames = stack_n_frames
-        self._resolution = resolution
+        assert len(resolution) == 2
+        self._resolution = tuple(resolution)
         self._frame_skip = frame_skip
         self._reward_scale = reward_scale
 

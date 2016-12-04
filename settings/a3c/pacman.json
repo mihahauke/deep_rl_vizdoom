@@ -4,6 +4,7 @@
   "base_tag": "pacman/",
   "run_tag": null,
   "threads_num": 16,
+  "input_n_last_actions": 4,
   "network_type": "lstm_ac",
   "run_tests": false,
   "local_steps_per_epoch": 10000,
