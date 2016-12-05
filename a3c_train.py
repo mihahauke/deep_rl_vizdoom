@@ -22,23 +22,19 @@ def train_a3c(settings):
     global_network = create_ac_network(actions_num=actions_num, misc_len=misc_len, **settings)
 
     # This global step counts gradient applications not performed actions.
-    with tf.name_scope("global"):
-        with tf.device(settings["device"]):
-            # TODO remove this with default tf.train.global_step
-            global_train_step = tf.Variable(0, trainable=False, name="GlobalStep")
-            global_learning_rate = tf.train.polynomial_decay(
-                learning_rate=settings["initial_learning_rate"],
-                end_learning_rate=settings["final_learning_rate"],
-                decay_steps=settings["learning_rate_decay_steps"],
-                global_step=global_train_step,
-                name="LearningRateDecay")
-            optimizer = ClippingRMSPropOptimizer(learning_rate=global_learning_rate, **settings["rmsprop"])
+    with tf.device(settings["device"]):
+        global_train_step = tf.Variable(0, trainable=False, name="global_step")
+        global_learning_rate = tf.train.polynomial_decay(
+            learning_rate=settings["initial_learning_rate"],
+            end_learning_rate=settings["final_learning_rate"],
+            decay_steps=settings["learning_rate_decay_steps"],
+            global_step=global_train_step,
+            name="LearningRateDecay")
+        optimizer = ClippingRMSPropOptimizer(learning_rate=global_learning_rate, **settings["rmsprop"])
 
     actor_learners = []
     for i in range(settings["threads_num"]):
-        actor_learner = ActorLearner(thread_index=i, global_network=global_network, global_train_step=global_train_step,
-                                     optimizer=optimizer,
-                                     **settings)
+        actor_learner = ActorLearner(thread_index=i, global_network=global_network, optimizer=optimizer, **settings)
         actor_learners.append(actor_learner)
 
     config = tf.ConfigProto(log_device_placement=False,

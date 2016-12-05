@@ -17,8 +17,6 @@ class ActorLearner(Thread):
     def __init__(self,
                  thread_index,
                  global_network,
-                 # TODO somehow move global train step somewhere else (tf 12 enables it now)
-                 global_train_step,
                  optimizer,
                  write_summaries=True,
                  **settings):
@@ -54,7 +52,7 @@ class ActorLearner(Thread):
         grads, local_vars = zip(*grads_and_vars)
         grads_and_global_vars = zip(grads, global_network.get_params())
 
-        self.train_op = optimizer.apply_gradients(grads_and_global_vars, global_step=global_train_step)
+        self.train_op = optimizer.apply_gradients(grads_and_global_vars, global_step=tf.train.get_global_step())
         self.sync_op = self.local_network.ops.sync(global_network)
 
         self.local_steps = 0
@@ -98,8 +96,8 @@ class ActorLearner(Thread):
         states_img = []
         states_misc = []
         actions = []
-        rewards = []
-        values = []
+        rewards_reversed = []
+        values_reversed = []
         advantages = []
         Rs = []
 
@@ -117,17 +115,16 @@ class ActorLearner(Thread):
             current_img, current_misc = self.doom_wrapper.get_current_state()
             policy, state_value = self.local_network.get_policy_and_value(self._session, [current_img, current_misc])
             action_index = ActorLearner.choose_action_index(policy)
-            values.insert(0, state_value)
+            values_reversed.insert(0, state_value)
             states_img.append(current_img)
             states_misc.append(current_misc)
-            actions.append(np.zeros([self.actions_num]))
+            actions.append(np.zeros([self.actions_num], dtype=np.float32))
             actions[-1][action_index] = 1
             reward = self.doom_wrapper.make_action(action_index)
             terminal = self.doom_wrapper.is_terminal()
 
-            rewards.insert(0, reward)
+            rewards_reversed.insert(0, reward)
             self.local_steps += 1
-
             if terminal:
                 terminal_end = True
                 if self.index == 0:
@@ -136,12 +133,13 @@ class ActorLearner(Thread):
                 if self.local_network.has_state():
                     self.local_network.reset_state()
                 break
+
         if terminal_end:
             R = 0.0
         else:
             R = self.local_network.get_value(self._session, self.doom_wrapper.get_current_state())
 
-        for ri, Vi in zip(rewards, values):
+        for ri, Vi in zip(rewards_reversed, values_reversed):
             R = ri + self.gamma * R
             advantages.insert(0, R - Vi)
             Rs.insert(0, R)
@@ -210,7 +208,7 @@ class ActorLearner(Thread):
         global_steps_per_sec = global_steps / elapsed_time
         global_mil_steps_per_hour = global_steps_per_sec * 3600 / 1000000.0
         print(
-            "TRAIN: mean: {}, min: {}, max:{}, "
+            "TRAIN: mean: {}, min: {}, max: {}, "
             "GlobalSteps: {}, LocalSpd: {:.0f} STEPS/s GlobalSpd: "
             "{} STEPS/s, {:.2f}M STEPS/hour, total elapsed time: {}".format(
                 green("{:0.3f}±{:0.2f}".format(mean_score, score_std)),

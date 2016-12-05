@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
 import numpy as np
-from tensorflow.contrib.layers import convolution2d, fully_connected, flatten
+from tensorflow.contrib import layers
 from tensorflow.python.ops.rnn_cell import LSTMStateTuple
+from tensorflow.contrib.framework import arg_scope
 
 from util import Record
 import inspect
@@ -12,8 +13,7 @@ import sys
 class _BaseACNet(object):
     def __init__(self,
                  actions_num,
-
-                 resolution=(84, 84),
+                 resolution=(80, 60),
                  misc_len=0,
                  stack_n_frames=4,
                  entropy_beta=0.01,
@@ -60,17 +60,13 @@ class _BaseACNet(object):
             self.vars.a = tf.placeholder(tf.float32, [None, self._actions_num], name="action")
             self.vars.advantage = tf.placeholder(tf.float32, [None], name="advantage")
             self.vars.R = tf.placeholder(tf.float32, [None], name="R")
-
+            # TODO add summaries for entropy, policy and value
             log_pi = tf.log(tf.clip_by_value(self.ops.pi, 1e-20, 1.0))
             entropy = -tf.reduce_sum(self.ops.pi * log_pi, reduction_indices=1)
-            # TODO maybe dacay entropy_beta?
-            # TODO is this tf.mul really needed?
             policy_loss = - tf.reduce_sum(
                 tf.reduce_sum(tf.mul(log_pi, self.vars.a),
                               reduction_indices=1) * self.vars.advantage + entropy * self._entropy_beta)
-
-            # TODO is further division by 2 needed?
-            value_loss = tf.nn.l2_loss(self.vars.R - self.ops.v)
+            value_loss = 0.5 * tf.reduce_sum(tf.squared_difference(self.vars.R, self.ops.v))
 
             self.ops.loss = policy_loss + value_loss
 
@@ -99,21 +95,18 @@ class _BaseACNet(object):
         return False
 
     def _get_default_conv_layers(self):
-        # TODO add initilizer options?
+        # TODO test tf.nn.elu
         # TODO test initialization as in the original paper (sampled from uniform)
+        with arg_scope([layers.conv2d], activation_fn=tf.nn.relu), arg_scope([layers.conv2d], data_format="NCHW"):
+            conv1 = layers.conv2d(self.vars.state_img, num_outputs=32, kernel_size=[8, 8], stride=4, padding="VALID",
+                                  scope=self._name_scope + "/conv1")
+            conv2 = layers.conv2d(conv1, num_outputs=64, kernel_size=[4, 4], stride=2, padding="VALID",
+                                  scope=self._name_scope + "/conv2", )
+            conv3 = layers.conv2d(conv2, num_outputs=64, kernel_size=[3, 3], stride=1, padding="VALID",
+                                  scope=self._name_scope + "/conv3", )
+            conv3_flat = layers.flatten(conv3)
 
-        conv1 = convolution2d(self.vars.state_img, num_outputs=32, kernel_size=[8, 8], stride=4, padding="VALID",
-                              scope=self._name_scope + "/conv1",
-                              biases_initializer=tf.constant_initializer(0.1))
-        conv2 = convolution2d(conv1, num_outputs=64, kernel_size=[4, 4], stride=2, padding="VALID",
-                              scope=self._name_scope + "/conv2",
-                              biases_initializer=tf.constant_initializer(0.1))
-        conv3 = convolution2d(conv2, num_outputs=64, kernel_size=[3, 3], stride=1, padding="VALID",
-                              scope=self._name_scope + "/conv3",
-                              biases_initializer=tf.constant_initializer(0.1))
-        conv3_flat = flatten(conv3)
-
-        return conv3_flat
+            return conv3_flat
 
     def _get_name_scope(self):
         raise NotImplementedError()
@@ -129,24 +122,25 @@ class FFACNet(_BaseACNet):
 
     def create_architecture(self, **specs):
         with tf.device(self._device):
-            state_shape = [None] + list(self._resolution) + [self._stack_n_frames]
+            state_shape = [None, self._stack_n_frames, self._resolution[1], self._resolution[0]]
             self.vars.state_img = tf.placeholder("float", state_shape, name="state_img")
             if self._misc_len > 0:
                 self.vars.state_misc = tf.placeholder("float", [None, self._misc_len], name="state_misc")
 
             conv_layers = self._get_default_conv_layers()
 
-            fc1 = fully_connected(conv_layers, num_outputs=256, scope=self._name_scope + "/fc1",
-                                  biases_initializer=tf.constant_initializer(0.1))
+            fc1 = layers.fully_connected(conv_layers, num_outputs=256, scope=self._name_scope + "/fc1",
+                                         biases_initializer=tf.constant_initializer(0.1),
+                                         activation_fn=tf.nn.relu)
 
-            self.ops.pi = fully_connected(fc1, num_outputs=self._actions_num, scope=self._name_scope + "/fc_pi",
-                                          activation_fn=tf.nn.softmax,
-                                          biases_initializer=tf.constant_initializer(0.1))
+            self.ops.pi = layers.fully_connected(fc1, num_outputs=self._actions_num, scope=self._name_scope + "/fc_pi",
+                                                 activation_fn=tf.nn.softmax,
+                                                 biases_initializer=tf.constant_initializer(0.1))
 
-            state_value = fully_connected(fc1, num_outputs=1,
-                                          scope=self._name_scope + "/fc_value",
-                                          activation_fn=None,
-                                          biases_initializer=tf.constant_initializer(0.1))
+            state_value = layers.fully_connected(fc1, num_outputs=1,
+                                                 scope=self._name_scope + "/fc_value",
+                                                 activation_fn=None,
+                                                 biases_initializer=tf.constant_initializer(0.1))
 
             self.ops.v = tf.reshape(state_value, [-1])
 
@@ -177,7 +171,7 @@ class _BaseRcurrentACNet(_BaseACNet):
 
     def create_architecture(self, **specs):
         with tf.device(self._device):
-            state_shape = [None] + list(self._resolution) + [self._stack_n_frames]
+            state_shape = [None, self._stack_n_frames, self._resolution[1], self._resolution[0]]
             self.vars.state_img = tf.placeholder(tf.float32, state_shape, name="state_img")
             if self._misc_len > 0:
                 self.vars.state_misc = tf.placeholder("float", [None, self._misc_len], name="state_misc")
@@ -190,8 +184,10 @@ class _BaseRcurrentACNet(_BaseACNet):
             else:
                 fc_input = conv_layers
 
-            fc1 = fully_connected(fc_input, num_outputs=self._recurrent_units_num, scope=self._name_scope + "/fc1",
-                                  biases_initializer=tf.constant_initializer(0.1))
+            fc1 = layers.fully_connected(fc_input, num_outputs=self._recurrent_units_num,
+                                         scope=self._name_scope + "/fc1",
+                                         biases_initializer=tf.constant_initializer(0.1),
+                                         activation_fn=tf.nn.relu)
 
             fc1_reshaped = tf.reshape(fc1, [1, -1, self._recurrent_units_num])
 
@@ -208,15 +204,15 @@ class _BaseRcurrentACNet(_BaseACNet):
 
             lstm_outputs = tf.reshape(lstm_outputs, [-1, self._recurrent_units_num])
 
-            self.ops.pi = fully_connected(lstm_outputs, num_outputs=self._actions_num,
-                                          scope=self._name_scope + "/fc_pi",
-                                          activation_fn=tf.nn.softmax,
-                                          biases_initializer=tf.constant_initializer(0.1))
+            self.ops.pi = layers.fully_connected(lstm_outputs, num_outputs=self._actions_num,
+                                                 scope=self._name_scope + "/fc_pi",
+                                                 activation_fn=tf.nn.softmax,
+                                                 biases_initializer=tf.constant_initializer(0.1))
 
-            state_value = fully_connected(lstm_outputs, num_outputs=1,
-                                          scope=self._name_scope + "/fc_value",
-                                          activation_fn=None,
-                                          biases_initializer=tf.constant_initializer(0.1))
+            state_value = layers.fully_connected(lstm_outputs, num_outputs=1,
+                                                 scope=self._name_scope + "/fc_value",
+                                                 activation_fn=None,
+                                                 biases_initializer=tf.constant_initializer(0.1))
 
             self.ops.v = tf.reshape(state_value, [-1])
 
@@ -295,7 +291,6 @@ class LstmACACNet(_BaseRcurrentACNet):
 
 
 # TODO make a module and move this methods somewhere else?
-# TODO add short name
 def get_available_networks():
     nets = []
     for member in inspect.getmembers(sys.modules[__name__]):

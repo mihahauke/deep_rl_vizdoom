@@ -4,7 +4,7 @@ import itertools as it
 import vizdoom as vzd
 import os
 import cv2
-
+from util.mock_vizdoom import MockDoomGame
 
 class VizdoomWrapper():
     def __init__(self,
@@ -20,19 +20,24 @@ class VizdoomWrapper():
                  use_misc=True,
                  misc_scale=None,
                  scenarios_path=os.path.join(vzd.__path__[0], "scenarios"),
+                 mock=False,
                  **kwargs):
+        if mock:
+            doom = MockDoomGame()
+        else:
+            doom = vzd.DoomGame()
 
-        doom = vzd.DoomGame()
-        if use_freedoom:
-            doom.set_doom_game_path(vzd.__path__[0] + "/freedoom2.wad")
+            if use_freedoom:
+                doom.set_doom_game_path(vzd.__path__[0] + "/freedoom2.wad")
+
+            doom.load_config(os.path.join(scenarios_path, str(config_file)))
+            doom.set_window_visible(display)
+            # TODO support for colors
+            doom.set_screen_format(vzd.ScreenFormat.GRAY8)
+            doom.set_screen_resolution(vzd.ScreenResolution.RES_160X120)
+            if not noinit:
+                doom.init()
         self.doom = doom
-        doom.load_config(os.path.join(scenarios_path, str(config_file)))
-        doom.set_window_visible(display)
-        # TODO support for colors
-        doom.set_screen_format(vzd.ScreenFormat.GRAY8)
-        doom.set_screen_resolution(vzd.ScreenResolution.RES_160X120)
-        if not noinit:
-            doom.init()
 
         self._stack_n_frames = stack_n_frames
         assert len(resolution) == 2
@@ -41,23 +46,23 @@ class VizdoomWrapper():
         self._reward_scale = reward_scale
 
         self._img_channels = stack_n_frames
-        self._img_shape = (resolution[0], resolution[1], stack_n_frames)
+        self._img_shape = (stack_n_frames, resolution[1], resolution[0])
         # TODO allow continuous actions
         self._actions = [list(a) for a in it.product([0, 1], repeat=len(doom.get_available_buttons()))]
         self.actions_num = len(self._actions)
         self._current_screen = None
         self._current_stacked_screen = np.zeros(self._img_shape, dtype=np.float32)
         self._last_reward = None
-        self._terminal = None
 
         self._current_stacked_misc = None
-        self.input_n_last_actions = None
-        self.misc_scale = False
+        self.input_n_last_actions = 0
+        self.misc_scale = None
         self.last_n_actions = None
 
-        if use_misc:
-            gvars_misc_len = len(doom.get_available_game_variables())
+        gvars_misc_len = len(doom.get_available_game_variables())
+        if use_misc and (gvars_misc_len or input_n_last_actions):
             if misc_scale:
+                assert len(misc_scale) <= gvars_misc_len
                 self.misc_scale = np.ones(gvars_misc_len, dtype=np.float32)
                 self.misc_scale[0:len(misc_scale)] = misc_scale
 
@@ -78,17 +83,21 @@ class VizdoomWrapper():
 
     def _update_screen(self):
         self._current_screen = self.preprocess(self.doom.get_state().screen_buffer)
-        self._current_stacked_screen = np.append(self._current_stacked_screen[:, :, 1:], self._current_screen,
-                                                 axis=2)
+        self._current_stacked_screen = np.append(self._current_stacked_screen[1:], self._current_screen,
+                                                 axis=0)
 
     def _update_misc(self):
+        # TODO add support for input_n_actions without game variables
         game_vars = self.doom.get_state().game_variables
         if self.misc_scale:
             game_vars *= self.misc_scale
+        if self.input_n_last_actions:
+            game_vars_end_i = -len(self.last_n_actions)
+        else:
+            game_vars_end_i = len(self._current_stacked_misc)
         self._current_stacked_misc[0:len(game_vars) * (self._stack_n_frames - 1)] = self._current_stacked_misc[
-                                                                                    len(game_vars):-len(
-                                                                                        self.last_n_actions)]
-        self._current_stacked_misc[len(game_vars) * (self._stack_n_frames - 1):-len(self.last_n_actions)] = game_vars
+                                                                                    len(game_vars):game_vars_end_i]
+        self._current_stacked_misc[len(game_vars) * (self._stack_n_frames - 1):game_vars_end_i] = game_vars
         if self.input_n_last_actions:
             self._current_stacked_misc[-len(self.last_n_actions):] = self.last_n_actions
 
@@ -97,16 +106,14 @@ class VizdoomWrapper():
         # img = cv2.resize(img, self._resolution, interpolation=cv2.INTER_CUBIC)
         # img = cv2.resize(img, self._resolution, interpolation=cv2.INTER_NEAREST)
         img = cv2.resize(img, self._resolution, interpolation=cv2.INTER_LINEAR)
-        img = img.astype(np.float32)/255.0
-        # TODO somehow get rid of this reshape
-        img = img.reshape(list(self._resolution) + [1])
+        img = img.astype(np.float32) / 255.0
+        img = img.reshape([1] + list(img.shape))
         return img
 
     def reset(self):
         self.doom.new_episode()
 
         self._last_reward = 0
-        self._terminal = False
 
         self._current_stacked_screen.fill(0)
         self._update_screen()
@@ -120,9 +127,8 @@ class VizdoomWrapper():
     def make_action(self, action_index):
         action = self._actions[action_index]
         self._last_reward = self.doom.make_action(action, self._frame_skip) * self._reward_scale
-        self._terminal = self.doom.is_episode_finished()
 
-        if not self._terminal:
+        if not self.doom.is_episode_finished():
             if self.input_n_last_actions:
                 self.last_n_actions[0:-self.actions_num] = self.last_n_actions[self.actions_num:]
                 last_action = np.zeros(self.actions_num, dtype=np.int8)

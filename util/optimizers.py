@@ -7,7 +7,7 @@ class ClippingRMSPropOptimizer(tf.train.RMSPropOptimizer):
                  learning_rate,
                  decay=0.9,
                  momentum=0.0,
-                 epsilon=0.1,
+                 epsilon=1e-10,
                  clip_norm=40.0,
                  name="ClippingRMSProp",
                  use_locking=False

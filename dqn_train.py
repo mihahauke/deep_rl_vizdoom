@@ -5,26 +5,14 @@ from util.parsers import parse_train_dqn_args
 import os
 
 
-def train_a3c(settings):
-    import tensorflow as tf
-    from actor_learner import ActorLearner
+def train_dqn(settings):
     from vizdoom_wrapper import VizdoomWrapper
-    from util import ThreadsafeCounter
-    from util.optimizers import DQNRMSPropOptimizer
+    from dqn import DQN
 
-    actions_num = VizdoomWrapper(noinit=True, **settings).actions_num
+    dqn = DQN(**settings)
+    dqn.train()
 
-    # This global step counts gradient applications not performed actions.
-    with tf.name_scope("global"):
-        with tf.device(settings["device"]):
-            global_train_step = tf.Variable(0, trainable=False, name="GlobalStep")
-            global_learning_rate = tf.train.polynomial_decay(
-                learning_rate=settings["initial_learning_rate"],
-                end_learning_rate=settings["final_learning_rate"],
-                decay_steps=settings["learning_rate_decay_steps"],
-                global_step=global_train_step,
-                name="LearningRateDecay")
-            optimizer = DQNRMSPropOptimizer(learning_rate=global_learning_rate, **settings["rmsprop"])
+
 
 
 
@@ -46,5 +34,5 @@ if __name__ == "__main__":
     if not os.path.isdir(dqn_settings["logdir"]):
         os.makedirs(dqn_settings["logdir"])
 
-    train_a3c(dqn_settings)
+    train_dqn(dqn_settings)
 
