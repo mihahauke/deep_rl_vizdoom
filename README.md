@@ -9,5 +9,5 @@
 
 To install pyton dependecies:
 ```
-sudo3 install numpy tqdm ruamel.yaml 
+sudo3 pip3 install numpy tqdm ruamel.yaml 
 ```
