@@ -11,17 +11,17 @@ import inspect
 import sys
 
 
-def _default_conv_layers(img_input, name_scope, activation_fn=tf.nn.relu, trainable=True):
+def _default_conv_layers(img_input, name_scope, activation_fn=tf.nn.relu, reuse=False):
     # TODO test tf.nn.elu
     # TODO test initialization as in the original paper (sampled from uniform)
     with arg_scope([layers.conv2d], activation_fn=activation_fn), arg_scope([layers.conv2d], data_format="NCHW",
-                                                                            trainable=trainable):
+                                                                            reuse=reuse):
         conv1 = layers.conv2d(img_input, num_outputs=32, kernel_size=[8, 8], stride=4, padding="VALID",
-                              scope=name_scope + "/conv1", trainable=trainable)
+                              scope=name_scope + "/conv1")
         conv2 = layers.conv2d(conv1, num_outputs=64, kernel_size=[4, 4], stride=2, padding="VALID",
-                              scope=name_scope + "/conv2", )
+                              scope=name_scope + "/conv2")
         conv3 = layers.conv2d(conv2, num_outputs=64, kernel_size=[3, 3], stride=1, padding="VALID",
-                              scope=name_scope + "/conv3", )
+                              scope=name_scope + "/conv3")
         conv3_flat = layers.flatten(conv3)
 
         return conv3_flat
@@ -304,11 +304,11 @@ class BaseDQNNet(object):
         self.ops = Record()
         self.vars = Record()
         self.vars.state_img = tf.placeholder(tf.float32, [None] + list(img_shape), name="state_img")
-        # self.vars.state2_img = tf.placeholder(tf.float32, [None] + list(img_shape), name="state2_img")
+        self.vars.state2_img = tf.placeholder(tf.float32, [None] + list(img_shape), name="state2_img")
         self.use_misc = misc_len > 0
         if self.use_misc:
             self.vars.state_misc = tf.placeholder("float", [None, misc_len], name="state_misc")
-            # self.vars.state2_misc = tf.placeholder("float", [None, misc_len], name="state2_misc")
+            self.vars.state2_misc = tf.placeholder("float", [None, misc_len], name="state2_misc")
         else:
             self.vars.state_misc = None
             self.vars.state2_misc = None
@@ -341,16 +341,11 @@ class BaseDQNNet(object):
         #     self.ops.loss = 0.5 * tf.reduce_sum(tf.squared_difference(self.vars.R, self.ops.v))
         frozen_name_scope = self._name_scope + "/frozen"
 
-        # TODO do slicing instead of split
-        _, s2_img = tf.split(0, 2, self.vars.state_img)
-        if self.use_misc:
-            _, s2_misc = tf.split(0, 2, self.vars.state_misc)
-        else:
-            s2_misc = None
-        batch_q = self.create_architecture(self.vars.state_img, self.vars.state_misc, trainable=True,
-                                     name_scope=self._name_scope)
-        q1, q2 = tf.split(0, 2, batch_q)
-        q2_frozen = self.create_architecture(s2_img, s2_misc, trainable=False,
+        q = self.create_architecture(self.vars.state_img, self.vars.state_misc, trainable=True,
+                                      name_scope=self._name_scope)
+        q2 = self.create_architecture(self.vars.state2_img, self.vars.state2_misc, trainable=True,
+                                      name_scope=self._name_scope, reuse=True)
+        q2_frozen = self.create_architecture(self.vars.state2_img, self.vars.state2_misc, trainable=False,
                                              name_scope=frozen_name_scope)
         best_a2 = tf.argmax(q2, axis=1)
         best_q2 = gather_2d(q2_frozen, best_a2)
@@ -358,11 +353,11 @@ class BaseDQNNet(object):
         target_q = self.vars.r + (1 - tf.to_float(self.vars.terminal)) * self.gamma * best_q2
         target_q = tf.stop_gradient(target_q)
         tf.stop_gradient(target_q)
-        active_q = gather_2d(q1, self.vars.a)
+        active_q = gather_2d(q, self.vars.a)
 
         loss = 0.5 * tf.reduce_mean((target_q - active_q) ** 2)
 
-        self.ops.best_action = tf.argmax(batch_q, axis=1)[0]
+        self.ops.best_action = tf.argmax(q, axis=1)[0]
         self.ops.train_batch = self.optimizer.minimize(loss)
 
         # Network freezing
@@ -371,8 +366,8 @@ class BaseDQNNet(object):
         unfreeze_ops = [tf.assign(dst_var, src_var) for src_var, dst_var in zip(net_params, target_net_params)]
         self.ops.unfreeze = tf.group(*unfreeze_ops, name="unfreeze")
 
-    def create_architecture(self, img_input, misc_input, trainable, name_scope, **specs):
-        conv_layers = _default_conv_layers(img_input, name_scope, trainable=trainable)
+    def create_architecture(self, img_input, misc_input, trainable, name_scope, reuse=False, **specs):
+        conv_layers = _default_conv_layers(img_input, name_scope, reuse=reuse)
 
         if self.use_misc:
             fc_input = tf.concat(concat_dim=1, values=[conv_layers, misc_input])
@@ -380,9 +375,9 @@ class BaseDQNNet(object):
             fc_input = conv_layers
 
         fc1 = layers.fully_connected(fc_input, num_outputs=256, scope=name_scope + "/fc1",
-                                     activation_fn=tf.nn.relu, trainable=trainable)
+                                     activation_fn=tf.nn.relu, reuse=reuse)
         q_op = layers.fully_connected(fc1, num_outputs=self._actions_num, scope=name_scope + "/fc_q",
-                                      activation_fn=None, trainable=trainable)
+                                      activation_fn=None, reuse=reuse)
         return q_op
 
     def get_action(self, sess, state):
@@ -392,10 +387,14 @@ class BaseDQNNet(object):
         return sess.run(self.ops.best_action, feed_dict=feed_dict)
 
     def train_batch(self, sess, batch):
-        feed_dict = {self.vars.state_img: batch["s_img"], self.vars.a: batch["a"],
-                     self.vars.r: batch["r"], self.vars.terminal: batch["terminal"]}
+        feed_dict = {self.vars.state_img: batch["s1_img"],
+                     self.vars.state2_img: batch["s2_img"],
+                     self.vars.a: batch["a"],
+                     self.vars.r: batch["r"],
+                     self.vars.terminal: batch["terminal"]}
         if self.use_misc:
-            feed_dict[self.vars.state_misc] = batch["s_misc"]
+            feed_dict[self.vars.state_misc] = batch["s1_misc"]
+            feed_dict[self.vars.state2_misc] = batch["s2_misc"]
         sess.run(self.ops.train_batch, feed_dict=feed_dict)
 
     def update_target_network(self, session):

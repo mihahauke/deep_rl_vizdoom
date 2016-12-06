@@ -12,6 +12,7 @@ prioritized_memory: true
 batchsize: 64
 memory_capacity: 10000
 frozen_steps: 5000
+update_pattern: [4, 4]
 
 # Training params
 epochs: Inf

@@ -51,8 +51,7 @@ class DQN(object):
         img_shape = self.doom_wrapper.img_shape
         self.use_misc = self.doom_wrapper.use_misc
         self.actions_num = self.doom_wrapper.actions_num
-        self.replay_memory = ReplayMemory(img_shape, misc_len, batch_size=batchsize, capacity=memory_capacity,
-                                          join_states=True)
+        self.replay_memory = ReplayMemory(img_shape, misc_len, batch_size=batchsize, capacity=memory_capacity)
         self.network = create_dqn_network(actions_num=self.actions_num, img_shape=img_shape, misc_len=misc_len,
                                           **settings)
 
