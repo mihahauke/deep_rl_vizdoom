@@ -5,15 +5,20 @@ import numpy as np
 
 
 class ReplayMemory:
-    def __init__(self, img_shape, misc_len=0, capacity=10000, batch_size=32):
+    def __init__(self, img_shape, misc_len=0, capacity=10000, batch_size=32, join_states=False):
+        self.join_states = join_states
         self._s1_img = np.zeros([capacity] + list(img_shape), dtype=np.float32)
         self._s2_img = np.zeros([capacity] + list(img_shape), dtype=np.float32)
         self._a = np.zeros(capacity, dtype=np.int32)
         self._r = np.zeros(capacity, dtype=np.float32)
         self._terminal = np.zeros(capacity, dtype=np.bool_)
 
-        self._s1_img_buf = np.zeros([batch_size] + list(img_shape), dtype=np.float32)
-        self._s2_img_buf = np.zeros([batch_size] + list(img_shape), dtype=np.float32)
+        if self.join_states:
+            self._s_img_buf = np.zeros([2 * batch_size] + list(img_shape), dtype=np.float32)
+        else:
+            self._s1_img_buf = np.zeros([batch_size] + list(img_shape), dtype=np.float32)
+            self._s2_img_buf = np.zeros([batch_size] + list(img_shape), dtype=np.float32)
+
         self._a_buf = np.zeros(batch_size, dtype=np.int32)
         self._r_buf = np.zeros(batch_size, dtype=np.float32)
         self.termianl_buf = np.zeros(batch_size, dtype=np.bool_)
@@ -21,8 +26,11 @@ class ReplayMemory:
         if misc_len > 0:
             self._s1_misc = np.zeros((capacity, misc_len), dtype=np.float32)
             self._s2_misc = np.zeros((capacity, misc_len), dtype=np.float32)
-            self._s1_misc_buf = np.zeros((batch_size, misc_len), dtype=np.float32)
-            self._s2_misc_buf = np.zeros((batch_size, misc_len), dtype=np.float32)
+            if self.join_states:
+                self._s_misc_buf = np.zeros((2 * batch_size, misc_len), dtype=np.float32)
+            else:
+                self._s1_misc_buf = np.zeros((batch_size, misc_len), dtype=np.float32)
+                self._s2_misc_buf = np.zeros((batch_size, misc_len), dtype=np.float32)
             self._misc = True
         else:
             self._s1_misc = None
@@ -37,14 +45,22 @@ class ReplayMemory:
         self._batch_size = batch_size
 
         ret = dict()
-        ret["s1_img"] = self._s1_img_buf
+        if self.join_states:
+            ret["s_img"] = self._s_img_buf
+        else:
+            ret["s1_img"] = self._s1_img_buf
+            ret["s2_img"] = self._s2_img_buf
+
         ret["a"] = self._a_buf
-        ret["s2_img"] = self._s2_img_buf
+
         ret["r"] = self._r_buf
         ret["terminal"] = self.termianl_buf
-        if misc_len > 0 :
-            ret["s1_misc"] = self._s1_misc_buf
-            ret["s2_misc"] = self._s2_misc_buf
+        if misc_len > 0:
+            if self.join_states:
+                ret["s_misc"] = self._s_misc_buf
+            else:
+                ret["s1_misc"] = self._s1_misc_buf
+                ret["s2_misc"] = self._s2_misc_buf
 
         self._ret_dict = ret.copy()
 
@@ -73,11 +89,19 @@ class ReplayMemory:
             raise Exception("Transition bank doesn't contain " + str(self._batch_size) + " entries.")
 
         indexes = random.sample(range(0, self.size), self._batch_size)
-        self._s1_img_buf[:] = self._s1_img[indexes]
-        self._s2_img_buf[:] = self._s2_img[indexes]
+        if self.join_states:
+            self._s_img_buf[0:self._batch_size] = self._s1_img[indexes]
+            self._s_img_buf[self._batch_size:] = self._s2_img[indexes]
+        else:
+            self._s1_img_buf[:] = self._s1_img[indexes]
+            self._s2_img_buf[:] = self._s2_img[indexes]
         if self._misc:
-            self._s1_misc_buf[:] = self._s1_misc[indexes]
-            self._s2_misc_buf[:] = self._s2_misc[indexes]
+            if self.join_states:
+                self._s_misc_buf[0:self._batch_size] = self._s1_misc[indexes]
+                self._s_misc_buf[self._batch_size:] = self._s2_misc[indexes]
+            else:
+                self._s1_misc_buf[:] = self._s1_misc[indexes]
+                self._s2_misc_buf[:] = self._s2_misc[indexes]
         self._a_buf[:] = self._a[indexes]
         self._r_buf[:] = self._r[indexes]
         self.termianl_buf[:] = self._terminal[indexes]

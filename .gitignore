@@ -95,3 +95,4 @@ models
 logs
 erlogs
 clear_logs.sh
+test.py

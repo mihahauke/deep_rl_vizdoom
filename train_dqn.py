@@ -12,6 +12,7 @@ if __name__ == "__main__":
 
     default_settings_filepath = "settings/dqn_defaults.yml"
     dqn_settings = yaml.safe_load(open(default_settings_filepath))
+
     for settings_fpath in args.settings_yml:
         override_settings = yaml.safe_load(open(settings_fpath))
         dqn_settings.update(override_settings)

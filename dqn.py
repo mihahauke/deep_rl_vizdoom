@@ -27,19 +27,15 @@ class DQN(object):
                  epsilon_decay_start_step=2e05,
                  frozen_steps=5000,
                  batchsize=32,
-                 replay_memory_capacity=10000,
+                 memory_capacity=10000,
+                 update_pattern=(4, 4),
                  **settings):
 
-        if settings["duelling"]:
-            # TODO perhaps different net?
-            pass
-        if settings["double"]:
-            # TODO perhaps different net?
-            pass
         if settings["prioritized_memory"]:
             # TODO
             pass
 
+        self.update_pattern = update_pattern
         self.write_summaries = write_summaries
         self._settings = settings
         date_string = strftime("%d.%m.%y-%H:%M")
@@ -55,7 +51,8 @@ class DQN(object):
         img_shape = self.doom_wrapper.img_shape
         self.use_misc = self.doom_wrapper.use_misc
         self.actions_num = self.doom_wrapper.actions_num
-        self.replay_memory = ReplayMemory(img_shape, misc_len, batch_size=batchsize, capacity=replay_memory_capacity)
+        self.replay_memory = ReplayMemory(img_shape, misc_len, batch_size=batchsize, capacity=memory_capacity,
+                                          join_states=True)
         self.network = create_dqn_network(actions_num=self.actions_num, img_shape=img_shape, misc_len=misc_len,
                                           **settings)
 
@@ -80,9 +77,6 @@ class DQN(object):
         self.epsilon_decay_rate = (initial_epsilon - final_epsilon) / epsilon_decay_steps
         self.epsilon_decay_start_step = epsilon_decay_start_step
         self.initial_epsilon = initial_epsilon
-
-    def create_architecture(self, inputs, trainable, namescope, **specs):
-        pass
 
     def get_current_epsilon(self):
         eps = self.initial_epsilon - (self.steps - self.epsilon_decay_start_step) * self.epsilon_decay_rate
@@ -127,6 +121,7 @@ class DQN(object):
             self.replay_memory.add_transition(s1, action_index, s2, reward, terminal)
 
         overall_start_time = time()
+        self.network.update_target_network(session)
         while self._epoch <= self._epochs:
             self.doom_wrapper.reset()
             train_scores = []
@@ -146,7 +141,9 @@ class DQN(object):
                 s2 = self.doom_wrapper.get_current_state()
                 self.replay_memory.add_transition(s1, action_index, s2, reward, terminal)
 
-                self.network.train_batch(session, self.replay_memory.get_sample())
+                if self.steps % self.update_pattern[0] == 0:
+                    for _ in range(self.update_pattern[1]):
+                        self.network.train_batch(session, self.replay_memory.get_sample())
 
                 if terminal:
                     train_scores.append(self.doom_wrapper.get_total_reward())
@@ -156,12 +153,12 @@ class DQN(object):
 
             train_time = time() - train_start_time
 
-            print("Epoch", self._epoch, "epsilon:",self.get_current_epsilon())
-            print("Training steps:", self.steps)
+            print("Epoch", self._epoch)
+            print("Training steps:", self.steps, ", epsilon:", self.get_current_epsilon())
             self.print_epoch_log("TRAIN", train_scores, self.train_steps_per_epoch, train_time)
             test_start_time = time()
             test_steps = 0
-            for _ in trange(self.test_episodes_per_epoch, leave=False,desc="Testing"):
+            for _ in trange(self.test_episodes_per_epoch, leave=False, desc="Testing"):
                 self.doom_wrapper.reset()
                 while not self.doom_wrapper.is_terminal():
                     test_steps += 1
@@ -177,3 +174,4 @@ class DQN(object):
             self.print_epoch_log("TEST", test_scores, test_steps, test_time)
             print("Total elapsed time:", sec_to_str(overall_time))
             print()
+            self._epoch += 1

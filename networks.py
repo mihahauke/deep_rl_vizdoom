@@ -27,6 +27,18 @@ def _default_conv_layers(img_input, name_scope, activation_fn=tf.nn.relu, traina
         return conv3_flat
 
 
+def _simplest_conv_layers(img_input, name_scope, activation_fn=tf.nn.relu, trainable=True):
+    with arg_scope([layers.conv2d], activation_fn=activation_fn), arg_scope([layers.conv2d], data_format="NCHW",
+                                                                            trainable=trainable):
+        conv1 = layers.conv2d(img_input, num_outputs=8, kernel_size=[6, 6], stride=3, padding="VALID",
+                              scope=name_scope + "/conv1", trainable=trainable)
+        conv2 = layers.conv2d(conv1, num_outputs=8, kernel_size=[3, 3], stride=2, padding="VALID",
+                              scope=name_scope + "/conv2", )
+        conv2_flat = layers.flatten(conv2)
+
+        return conv2_flat
+
+
 # A3C nets:
 
 class _BaseACNet(object):
@@ -286,15 +298,17 @@ class BaseDQNNet(object):
                  gamma,
                  misc_len=0,
                  **settings):
+        # TODO architecture customization from yaml
+        # TODO summaries to TB
         self.gamma = np.float32(gamma)
         self.ops = Record()
         self.vars = Record()
         self.vars.state_img = tf.placeholder(tf.float32, [None] + list(img_shape), name="state_img")
-        self.vars.state2_img = tf.placeholder(tf.float32, [None] + list(img_shape), name="state2_img")
+        # self.vars.state2_img = tf.placeholder(tf.float32, [None] + list(img_shape), name="state2_img")
         self.use_misc = misc_len > 0
         if self.use_misc:
             self.vars.state_misc = tf.placeholder("float", [None, misc_len], name="state_misc")
-            self.vars.state2_misc = tf.placeholder("float", [None, misc_len], name="state2_misc")
+            # self.vars.state2_misc = tf.placeholder("float", [None, misc_len], name="state2_misc")
         else:
             self.vars.state_misc = None
             self.vars.state2_misc = None
@@ -302,34 +316,12 @@ class BaseDQNNet(object):
 
         self._name_scope = self._get_name_scope()
 
-        # TODO make it configurable from json
-        # self.create_architecture()
-        # self._prepare_loss_op()
         self.vars.a = tf.placeholder(tf.int32, [None], "action")
         self.vars.r = tf.placeholder(tf.float32, [None], "reward")
         self.vars.terminal = tf.placeholder(tf.bool, [None], "terminal")
 
-        frozen_name_scope = self._name_scope + "/frozen"
-        q = self.create_architecture(self.vars.state_img, self.vars.state_misc, trainable=True,
-                                     name_scope=self._name_scope)
-        q2 = self.create_architecture(self.vars.state2_img, self.vars.state2_misc, trainable=False,
-                                      name_scope=frozen_name_scope)
-        net_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self._name_scope)
-        target_net_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=frozen_name_scope)
-
-        unfreeze_ops = [tf.assign(dst_var, src_var) for src_var, dst_var in zip(net_params, target_net_params)]
-
-        self.ops.unfreeze = tf.group(*unfreeze_ops, name="unfreeze")
-        self.ops.best_action = tf.argmax(q, axis=1)[0]
-
-        best_q2 = tf.reduce_max(q2, axis=1)
-        target_q = self.vars.r + self.gamma * best_q2 * (1 - tf.to_float(self.vars.terminal))
-        active_q = gather_2d(q, self.vars.a)
-
-        loss = 0.5 * tf.reduce_mean((target_q - active_q) ** 2)
-
         global_step = tf.Variable(0, trainable=False, name="global_step")
-        # TODO customize learning rate decay
+        # TODO customize learning rate decay more
         if settings["constant_learning_rate"]:
             learning_rate = settings["initial_learning_rate"]
         else:
@@ -339,14 +331,45 @@ class BaseDQNNet(object):
                 decay_steps=settings["learning_rate_decay_steps"],
                 global_step=global_step)
 
-        optimizer = tf.train.RMSPropOptimizer(learning_rate=learning_rate, **settings["rmsprop"])
-        self.ops.train_batch = optimizer.minimize(loss)
+        self.optimizer = tf.train.RMSPropOptimizer(learning_rate=learning_rate, **settings["rmsprop"])
+        self._prepare_ops()
 
-    def _prepare_loss_op(self):
+    def _prepare_ops(self):
         pass
         #     self.vars.a = tf.placeholder(tf.float32, [None, self._actions_num], name="action")
         #     self.vars.R = tf.placeholder(tf.float32, [None], name="R")
         #     self.ops.loss = 0.5 * tf.reduce_sum(tf.squared_difference(self.vars.R, self.ops.v))
+        frozen_name_scope = self._name_scope + "/frozen"
+
+        # TODO do slicing instead of split
+        _, s2_img = tf.split(0, 2, self.vars.state_img)
+        if self.use_misc:
+            _, s2_misc = tf.split(0, 2, self.vars.state_misc)
+        else:
+            s2_misc = None
+        batch_q = self.create_architecture(self.vars.state_img, self.vars.state_misc, trainable=True,
+                                     name_scope=self._name_scope)
+        q1, q2 = tf.split(0, 2, batch_q)
+        q2_frozen = self.create_architecture(s2_img, s2_misc, trainable=False,
+                                             name_scope=frozen_name_scope)
+        best_a2 = tf.argmax(q2, axis=1)
+        best_q2 = gather_2d(q2_frozen, best_a2)
+
+        target_q = self.vars.r + (1 - tf.to_float(self.vars.terminal)) * self.gamma * best_q2
+        target_q = tf.stop_gradient(target_q)
+        tf.stop_gradient(target_q)
+        active_q = gather_2d(q1, self.vars.a)
+
+        loss = 0.5 * tf.reduce_mean((target_q - active_q) ** 2)
+
+        self.ops.best_action = tf.argmax(batch_q, axis=1)[0]
+        self.ops.train_batch = self.optimizer.minimize(loss)
+
+        # Network freezing
+        net_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self._name_scope)
+        target_net_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=frozen_name_scope)
+        unfreeze_ops = [tf.assign(dst_var, src_var) for src_var, dst_var in zip(net_params, target_net_params)]
+        self.ops.unfreeze = tf.group(*unfreeze_ops, name="unfreeze")
 
     def create_architecture(self, img_input, misc_input, trainable, name_scope, **specs):
         conv_layers = _default_conv_layers(img_input, name_scope, trainable=trainable)
@@ -369,12 +392,10 @@ class BaseDQNNet(object):
         return sess.run(self.ops.best_action, feed_dict=feed_dict)
 
     def train_batch(self, sess, batch):
-        feed_dict = {self.vars.state_img: batch["s1_img"], self.vars.a: batch["a"],
-                     self.vars.r: batch["r"], self.vars.state2_img: batch["s2_img"],
-                     self.vars.terminal: batch["terminal"]}
+        feed_dict = {self.vars.state_img: batch["s_img"], self.vars.a: batch["a"],
+                     self.vars.r: batch["r"], self.vars.terminal: batch["terminal"]}
         if self.use_misc:
-            feed_dict[self.vars.state_misc] = batch["s1_misc"]
-            feed_dict[self.vars.state2_misc] = batch["s2_misc"]
+            feed_dict[self.vars.state_misc] = batch["s_misc"]
         sess.run(self.ops.train_batch, feed_dict=feed_dict)
 
     def update_target_network(self, session):
