@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow.python.training.optimizer import Optimizer
 
-
+# TODO separate class is superfluous, just clip the gradients where they are produces ....
 class ClippingRMSPropOptimizer(tf.train.RMSPropOptimizer):
     def __init__(self,
                  learning_rate,
@@ -34,8 +34,3 @@ class ClippingRMSPropOptimizer(tf.train.RMSPropOptimizer):
         if self._clip_norm is not None and self._clip_norm > 0:
             grads_and_vars = [(tf.clip_by_norm(grad, self._clip_norm), var) for grad, var in grads_and_vars]
         return grads_and_vars
-
-
-class DQNRMSPropOptimizer(tf.train.RMSPropOptimizer):
-    def __init__(self, **kwargs):
-        super(DQNRMSPropOptimizer, self).__init__(**kwargs)

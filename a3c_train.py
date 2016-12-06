@@ -18,8 +18,9 @@ def train_a3c(settings):
     tmpVizdoomWrapper = VizdoomWrapper(noinit=True, **settings)
     actions_num = tmpVizdoomWrapper.actions_num
     misc_len = tmpVizdoomWrapper.misc_len
+    img_shape = tmpVizdoomWrapper.img_shape
     tmpVizdoomWrapper = None
-    global_network = create_ac_network(actions_num=actions_num, misc_len=misc_len, **settings)
+    global_network = create_ac_network(actions_num=actions_num, misc_len=misc_len, img_shape=img_shape, **settings)
 
     # This global step counts gradient applications not performed actions.
     with tf.device(settings["device"]):
@@ -28,8 +29,7 @@ def train_a3c(settings):
             learning_rate=settings["initial_learning_rate"],
             end_learning_rate=settings["final_learning_rate"],
             decay_steps=settings["learning_rate_decay_steps"],
-            global_step=global_train_step,
-            name="LearningRateDecay")
+            global_step=global_train_step)
         optimizer = ClippingRMSPropOptimizer(learning_rate=global_learning_rate, **settings["rmsprop"])
 
     actor_learners = []

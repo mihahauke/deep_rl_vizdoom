@@ -3,7 +3,7 @@
   "base_tag": "simpler_basic",
   "network_type": "ff_ac",
   "threads_num": 8,
-  "stack_n_frames": 1,
+  "stack_n_frames": 4,
   "reward_scale": 0.01,
   "use_misc": false
 }

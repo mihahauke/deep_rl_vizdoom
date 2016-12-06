@@ -3,19 +3,7 @@
 import json
 from util.parsers import parse_train_dqn_args
 import os
-
-
-def train_dqn(settings):
-    from vizdoom_wrapper import VizdoomWrapper
-    from dqn import DQN
-
-    dqn = DQN(**settings)
-    dqn.train()
-
-
-
-
-
+from dqn import DQN
 
 if __name__ == "__main__":
     # TODO make tqdm work when stderr is redirected
@@ -34,5 +22,5 @@ if __name__ == "__main__":
     if not os.path.isdir(dqn_settings["logdir"]):
         os.makedirs(dqn_settings["logdir"])
 
-    train_dqn(dqn_settings)
-
+    dqn = DQN(**dqn_settings)
+    dqn.train()

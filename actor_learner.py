@@ -39,12 +39,13 @@ class ActorLearner(Thread):
 
         self.doom_wrapper = VizdoomWrapper(**settings)
         misc_len = self.doom_wrapper.misc_len
+        img_shape = self.doom_wrapper.img_shape
         self.use_misc = self.doom_wrapper.use_misc
 
         self.actions_num = self.doom_wrapper.actions_num
 
-        self.local_network = create_ac_network(actions_num=self.actions_num, thread=thread_index, misc_len=misc_len,
-                                               **settings)
+        self.local_network = create_ac_network(actions_num=self.actions_num, img_shape=img_shape, misc_len=misc_len,
+                                               thread=thread_index, **settings)
 
         # TODO check gate_gradients != Optimizer.GATE_OP
         grads_and_vars = optimizer.compute_gradients(self.local_network.ops.loss,
@@ -53,9 +54,11 @@ class ActorLearner(Thread):
         grads_and_global_vars = zip(grads, global_network.get_params())
 
         self.train_op = optimizer.apply_gradients(grads_and_global_vars, global_step=tf.train.get_global_step())
+        # TODO create prepare_sync_op and run self.network.ops.sync later
         self.sync_op = self.local_network.ops.sync(global_network)
 
         self.local_steps = 0
+        # TODO epoch as tf variable?
         self._epoch = 1
         self.train_scores = []
 
@@ -64,11 +67,11 @@ class ActorLearner(Thread):
         self._summaries = None
 
         if self.index == 0:
+            # TODO get std, min and max - use lists instead od scalars
             self._model_savefile = settings["models_path"] + "/" + self._run_string
             if self.write_summaries:
-                self.test_score = tf.placeholder(tf.float32)
-                self.score_summary = tf.placeholder(tf.float32)
-                tf.scalar_summary(self._run_string + "/score", self.score_summary)
+                self.score = tf.placeholder(tf.float32)
+                tf.scalar_summary(self._run_string + "/mean_score", self.score)
                 self._summaries = tf.merge_all_summaries()
         else:
             self._model_savefile = None
@@ -106,6 +109,7 @@ class ActorLearner(Thread):
         self._session.run(self.sync_op)
 
         initial_network_state = None
+        # TODO add remember state or sumtin
         if self.local_network.has_state():
             initial_network_state = self.local_network.get_current_network_state()
 
@@ -144,6 +148,7 @@ class ActorLearner(Thread):
             advantages.insert(0, R - Vi)
             Rs.insert(0, R)
 
+        # TODO delegate this to the network as train_batch(session, ...)
         train_op_feed_dict = {
             self.local_network.vars.state_img: states_img,
             self.local_network.vars.a: actions,
@@ -238,7 +243,7 @@ class ActorLearner(Thread):
 
                     if self.index == 0:
                         self._print_log(self.train_scores, overall_start_time, last_log_time, local_steps_for_log)
-                        mean_train_scre = np.mean(self.train_scores)
+                        mean_train_score = np.mean(self.train_scores)
                         self.train_scores = []
 
                         test_score = None
@@ -246,10 +251,10 @@ class ActorLearner(Thread):
                             test_score = self.test(self._session)
 
                         if self.write_summaries:
-                            train_summary = self._session.run(self._summaries, {self.score_summary: mean_train_scre})
+                            train_summary = self._session.run(self._summaries, {self.score: mean_train_score})
                             self._train_writer.add_summary(train_summary, global_steps)
                             if self._run_tests:
-                                test_summary = self._session.run(self._summaries, {self.score_summary: test_score})
+                                test_summary = self._session.run(self._summaries, {self.score: test_score})
                                 self._test_writer.add_summary(test_summary, global_steps)
 
                         last_log_time = time.time()

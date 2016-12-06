@@ -6,7 +6,8 @@ import os
 import cv2
 from util.mock_vizdoom import MockDoomGame
 
-class VizdoomWrapper():
+
+class VizdoomWrapper(object):
     def __init__(self,
                  config_file,
                  frame_skip,
@@ -46,12 +47,12 @@ class VizdoomWrapper():
         self._reward_scale = reward_scale
 
         self._img_channels = stack_n_frames
-        self._img_shape = (stack_n_frames, resolution[1], resolution[0])
+        self.img_shape = (stack_n_frames, resolution[1], resolution[0])
         # TODO allow continuous actions
         self._actions = [list(a) for a in it.product([0, 1], repeat=len(doom.get_available_buttons()))]
         self.actions_num = len(self._actions)
         self._current_screen = None
-        self._current_stacked_screen = np.zeros(self._img_shape, dtype=np.float32)
+        self._current_stacked_screen = np.zeros(self.img_shape, dtype=np.float32)
         self._last_reward = None
 
         self._current_stacked_misc = None
@@ -115,13 +116,13 @@ class VizdoomWrapper():
 
         self._last_reward = 0
 
-        self._current_stacked_screen.fill(0)
+        self._current_stacked_screen = np.zeros_like(self._current_stacked_screen)
         self._update_screen()
 
         if self.use_misc:
             if self.input_n_last_actions:
                 self.last_n_actions.fill(0)
-            self._current_stacked_misc.fill(0)
+            self._current_stacked_misc = np.zeros_like(self._current_stacked_misc)
             self._update_misc()
 
     def make_action(self, action_index):
