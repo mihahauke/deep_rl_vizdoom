@@ -40,10 +40,10 @@ gamma: 0.99
 
 # Vizdoom wrapper options:
 resolution: [ 80, 60 ]
+frame_skip: 4
 stack_n_frames: 4
 use_freedoom: false
 display: false
-frame_skip: 4
 reward_scale: 1.0
 use_misc: true
 input_n_last_actions: false

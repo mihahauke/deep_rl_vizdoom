@@ -3,7 +3,6 @@ models_path: models
 logdir: logs
 run_tag: null
 use_freedoom: false
-device: /gpu:0
 network_type: lstm_ac
 
 # General training options

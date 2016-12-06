@@ -11,29 +11,26 @@ import inspect
 import sys
 
 
-def _default_conv_layers(img_input, name_scope, activation_fn=tf.nn.relu, reuse=False):
+def _default_conv_layers(img_input, name_scope):
     # TODO test tf.nn.elu
     # TODO test initialization as in the original paper (sampled from uniform)
-    with arg_scope([layers.conv2d], activation_fn=activation_fn), arg_scope([layers.conv2d], data_format="NCHW",
-                                                                            reuse=reuse):
-        conv1 = layers.conv2d(img_input, num_outputs=32, kernel_size=[8, 8], stride=4, padding="VALID",
-                              scope=name_scope + "/conv1")
-        conv2 = layers.conv2d(conv1, num_outputs=64, kernel_size=[4, 4], stride=2, padding="VALID",
-                              scope=name_scope + "/conv2")
-        conv3 = layers.conv2d(conv2, num_outputs=64, kernel_size=[3, 3], stride=1, padding="VALID",
-                              scope=name_scope + "/conv3")
-        conv3_flat = layers.flatten(conv3)
+    conv1 = layers.conv2d(img_input, num_outputs=32, kernel_size=[8, 8], stride=4, padding="VALID",
+                          scope=name_scope + "/conv1")
+    conv2 = layers.conv2d(conv1, num_outputs=64, kernel_size=[4, 4], stride=2, padding="VALID",
+                          scope=name_scope + "/conv2")
+    conv3 = layers.conv2d(conv2, num_outputs=64, kernel_size=[3, 3], stride=1, padding="VALID",
+                          scope=name_scope + "/conv3")
+    conv3_flat = layers.flatten(conv3)
 
-        return conv3_flat
+    return conv3_flat
 
 
-def _simplest_conv_layers(img_input, name_scope, activation_fn=tf.nn.relu, trainable=True):
-    with arg_scope([layers.conv2d], activation_fn=activation_fn), arg_scope([layers.conv2d], data_format="NCHW",
-                                                                            trainable=trainable):
+def _simplest_conv_layers(img_input, name_scope, activation_fn=tf.nn.relu, reuse=False):
+    with arg_scope([layers.conv2d], activation_fn=activation_fn, data_format="NCHW", reuse=reuse):
         conv1 = layers.conv2d(img_input, num_outputs=8, kernel_size=[6, 6], stride=3, padding="VALID",
-                              scope=name_scope + "/conv1", trainable=trainable)
+                              scope=name_scope + "/conv1", reuse=reuse)
         conv2 = layers.conv2d(conv1, num_outputs=8, kernel_size=[3, 3], stride=2, padding="VALID",
-                              scope=name_scope + "/conv2", )
+                              scope=name_scope + "/conv2", reuse=reuse)
         conv2_flat = layers.flatten(conv2)
 
         return conv2_flat
@@ -48,7 +45,9 @@ class _BaseACNet(object):
                  misc_len=0,
                  entropy_beta=0.01,
                  thread="global",
+                 activation_fn="tf.nn.relu",
                  **ignored):
+        self.activation_fn = eval(activation_fn)
         self.ops = Record()
         self.vars = Record()
         self.vars.state_img = tf.placeholder(tf.float32, [None] + list(img_shape), name="state_img")
@@ -64,7 +63,9 @@ class _BaseACNet(object):
         self.ops.sync = self._sync_op
 
         # TODO make it configurable from json
-        self.create_architecture()
+        with arg_scope([layers.conv2d], activation_fn=self.activation_fn, data_format="NCHW"), \
+             arg_scope([layers.fully_connected], activation_fn=self.activation_fn):
+            self.create_architecture()
         self._prepare_loss_op()
         self._params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self._name_scope)
 
@@ -129,7 +130,7 @@ class FFACNet(_BaseACNet):
     def _get_name_scope(self):
         return "a3c_ff_net"
 
-    def create_architecture(self, **specs):
+    def create_architecture(self):
         conv_layers = _default_conv_layers(self.vars.state_img, self._name_scope)
 
         if self.use_misc:
@@ -137,18 +138,19 @@ class FFACNet(_BaseACNet):
         else:
             fc_input = conv_layers
 
-        fc1 = layers.fully_connected(fc_input, num_outputs=256, scope=self._name_scope + "/fc1",
-                                     biases_initializer=tf.constant_initializer(0.1),
-                                     activation_fn=tf.nn.relu)
+        fc1 = layers.fully_connected(fc_input, num_outputs=512, scope=self._name_scope + "/fc1",
+                                     biases_initializer=tf.constant_initializer(0.1))
 
-        self.ops.pi = layers.fully_connected(fc1, num_outputs=self._actions_num, scope=self._name_scope + "/fc_pi",
-                                             activation_fn=tf.nn.softmax)
+        pi = layers.fully_connected(fc1, num_outputs=self._actions_num, scope=self._name_scope + "/fc_pi",
+                                    activation_fn=tf.nn.softmax)
 
-        state_value = layers.fully_connected(fc1, num_outputs=1,
-                                             scope=self._name_scope + "/fc_value",
-                                             activation_fn=None)
+        state_value = layers.linear(fc1, num_outputs=1, scope=self._name_scope + "/fc_value")
 
-        self.ops.v = tf.reshape(state_value, [-1])
+        v = tf.reshape(state_value, [-1])
+
+        self.ops.pi = pi
+        self.ops.v = v
+        return pi, v
 
     def _get_standard_feed_dict(self, state):
         feed_dict = {self.vars.state_img: [state[0]]}
@@ -187,8 +189,7 @@ class _BaseRcurrentACNet(_BaseACNet):
 
         fc1 = layers.fully_connected(fc_input, num_outputs=self._recurrent_units_num,
                                      scope=self._name_scope + "/fc1",
-                                     biases_initializer=tf.constant_initializer(0.1),
-                                     activation_fn=tf.nn.relu)
+                                     biases_initializer=tf.constant_initializer(0.1))
 
         fc1_reshaped = tf.reshape(fc1, [1, -1, self._recurrent_units_num])
 
@@ -205,17 +206,16 @@ class _BaseRcurrentACNet(_BaseACNet):
 
         lstm_outputs = tf.reshape(lstm_outputs, [-1, self._recurrent_units_num])
 
-        self.ops.pi = layers.fully_connected(lstm_outputs, num_outputs=self._actions_num,
-                                             scope=self._name_scope + "/fc_pi",
-                                             activation_fn=tf.nn.softmax)
+        pi = layers.fully_connected(lstm_outputs, num_outputs=self._actions_num,
+                                    scope=self._name_scope + "/fc_pi",
+                                    activation_fn=tf.nn.softmax)
+        state_value = layers.linear(lstm_outputs, num_outputs=1, scope=self._name_scope + "/fc_value")
+        v = tf.reshape(state_value, [-1])
 
-        state_value = layers.fully_connected(lstm_outputs, num_outputs=1,
-                                             scope=self._name_scope + "/fc_value",
-                                             activation_fn=None)
-
-        self.ops.v = tf.reshape(state_value, [-1])
-
+        self.ops.pi = pi
+        self.ops.v = v
         self.reset_state()
+        return pi, v
 
     def reset_state(self):
         state_c = np.zeros([1, self._recurrent_cells.state_size.c], dtype=np.float32)
@@ -298,9 +298,11 @@ class BaseDQNNet(object):
                  gamma,
                  misc_len=0,
                  double=True,
+                 activation_fn="tf.nn.relu",
                  **settings):
         # TODO architecture customization from yaml
         # TODO summaries to TB
+        self.activation_fn = eval(activation_fn)
         self.double = double
         self.gamma = np.float32(gamma)
         self.ops = Record()
@@ -343,17 +345,20 @@ class BaseDQNNet(object):
         #     self.ops.loss = 0.5 * tf.reduce_sum(tf.squared_difference(self.vars.R, self.ops.v))
         frozen_name_scope = self._name_scope + "/frozen"
 
-        q = self.create_architecture(self.vars.state_img, self.vars.state_misc, trainable=True,
-                                     name_scope=self._name_scope)
-        q2_frozen = self.create_architecture(self.vars.state2_img, self.vars.state2_misc, trainable=False,
-                                             name_scope=frozen_name_scope)
-        if self.double:
-            q2 = self.create_architecture(self.vars.state2_img, self.vars.state2_misc, trainable=True,
-                                          name_scope=self._name_scope, reuse=True)
-            best_a2 = tf.argmax(q2, axis=1)
-            best_q2 = gather_2d(q2_frozen, best_a2)
-        else:
-            best_q2 = tf.reduce_max(q2_frozen, axis=1)
+        with arg_scope([layers.conv2d], activation_fn=self.activation_fn, data_format="NCHW"), \
+             arg_scope([layers.fully_connected], activation_fn=self.activation_fn):
+
+            q = self.create_architecture(self.vars.state_img, self.vars.state_misc,
+                                         name_scope=self._name_scope)
+            q2_frozen = self.create_architecture(self.vars.state2_img, self.vars.state2_misc,
+                                                 name_scope=frozen_name_scope)
+            if self.double:
+                q2 = self.create_architecture(self.vars.state2_img, self.vars.state2_misc,
+                                              name_scope=self._name_scope, reuse=True)
+                best_a2 = tf.argmax(q2, axis=1)
+                best_q2 = gather_2d(q2_frozen, best_a2)
+            else:
+                best_q2 = tf.reduce_max(q2_frozen, axis=1)
 
         target_q = self.vars.r + (1 - tf.to_float(self.vars.terminal)) * self.gamma * best_q2
         target_q = tf.stop_gradient(target_q)
@@ -371,19 +376,20 @@ class BaseDQNNet(object):
         unfreeze_ops = [tf.assign(dst_var, src_var) for src_var, dst_var in zip(net_params, target_net_params)]
         self.ops.unfreeze = tf.group(*unfreeze_ops, name="unfreeze")
 
-    def create_architecture(self, img_input, misc_input, trainable, name_scope, reuse=False, **specs):
-        conv_layers = _default_conv_layers(img_input, name_scope, reuse=reuse)
+    def create_architecture(self, img_input, misc_input, name_scope, reuse=False):
+        with arg_scope([layers.conv2d, layers.fully_connected], reuse=reuse), \
+             arg_scope([], reuse=reuse):
+            conv_layers = _default_conv_layers(img_input, name_scope)
 
-        if self.use_misc:
-            fc_input = tf.concat(concat_dim=1, values=[conv_layers, misc_input])
-        else:
-            fc_input = conv_layers
+            if self.use_misc:
+                fc_input = tf.concat(concat_dim=1, values=[conv_layers, misc_input])
+            else:
+                fc_input = conv_layers
 
-        fc1 = layers.fully_connected(fc_input, num_outputs=256, scope=name_scope + "/fc1",
-                                     activation_fn=tf.nn.relu, reuse=reuse)
-        q_op = layers.fully_connected(fc1, num_outputs=self._actions_num, scope=name_scope + "/fc_q",
-                                      activation_fn=None, reuse=reuse)
-        return q_op
+            fc1 = layers.fully_connected(fc_input, num_outputs=512, scope=name_scope + "/fc1")
+            q_op = layers.linear(fc1, num_outputs=self._actions_num, scope=name_scope + "/fc_q")
+
+            return q_op
 
     def get_action(self, sess, state):
         feed_dict = {self.vars.state_img: [state[0]]}
@@ -407,6 +413,36 @@ class BaseDQNNet(object):
 
     def _get_name_scope(self):
         return "dqn"
+
+
+class DuelingDQNNet(BaseDQNNet):
+    def __init__(self, *args, **kwargs):
+        super(DuelingDQNNet, self).__init__(*args, **kwargs)
+
+    def _get_name_scope(self):
+        return "deeling_dqn"
+
+    def create_architecture(self, img_input, misc_input, name_scope, reuse=False, **specs):
+        with arg_scope([layers.conv2d, layers.fully_connected], reuse=reuse), \
+             arg_scope([], reuse=reuse):
+            conv_layers = _default_conv_layers(img_input, name_scope)
+
+            if self.use_misc:
+                fc_input = tf.concat(concat_dim=1, values=[conv_layers, misc_input])
+            else:
+                fc_input = conv_layers
+
+            fc1 = layers.fully_connected(fc_input, num_outputs=512, scope=name_scope + "/fc1")
+
+            fc2_value = layers.fully_connected(fc1, num_outputs=256, scope=name_scope + "/fc2_value")
+            value = layers.linear(fc2_value, num_outputs=1, scope=name_scope + "/fc3_value")
+
+            fc2_advantage = layers.fully_connected(fc1, num_outputs=256, scope=name_scope + "/fc2_advantage")
+            advantage = layers.linear(fc2_advantage, num_outputs=self._actions_num, scope=name_scope + "/fc3_advantage")
+
+            mean_advantage = tf.reshape(tf.reduce_mean(advantage, axis=1), (-1, 1))
+            q_op = advantage + (mean_advantage - value)
+            return q_op
 
 
 # TODO make a module and move this methods somewhere else?
@@ -444,7 +480,7 @@ def create_ac_network(network_type, **args):
 
 
 def create_dqn_network(network_type, **args):
-    _short_names = {BaseDQNNet: "base_dqn"}
+    _short_names = {BaseDQNNet: "base_dqn", DuelingDQNNet: "duelling_dqn"}
     _inv_short_names = {v: k for k, v in _short_names.items()}
     if network_type is not None:
         for mname, mclass in get_available_ac_networks():
