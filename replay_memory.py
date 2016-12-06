@@ -12,7 +12,6 @@ class ReplayMemory:
         self._r = np.zeros(capacity, dtype=np.float32)
         self._terminal = np.zeros(capacity, dtype=np.bool_)
 
-
         self._s1_img_buf = np.zeros([batch_size] + list(img_shape), dtype=np.float32)
         self._s2_img_buf = np.zeros([batch_size] + list(img_shape), dtype=np.float32)
 

@@ -297,9 +297,11 @@ class BaseDQNNet(object):
                  img_shape,
                  gamma,
                  misc_len=0,
+                 double=True,
                  **settings):
         # TODO architecture customization from yaml
         # TODO summaries to TB
+        self.double = double
         self.gamma = np.float32(gamma)
         self.ops = Record()
         self.vars = Record()
@@ -342,13 +344,16 @@ class BaseDQNNet(object):
         frozen_name_scope = self._name_scope + "/frozen"
 
         q = self.create_architecture(self.vars.state_img, self.vars.state_misc, trainable=True,
-                                      name_scope=self._name_scope)
-        q2 = self.create_architecture(self.vars.state2_img, self.vars.state2_misc, trainable=True,
-                                      name_scope=self._name_scope, reuse=True)
+                                     name_scope=self._name_scope)
         q2_frozen = self.create_architecture(self.vars.state2_img, self.vars.state2_misc, trainable=False,
                                              name_scope=frozen_name_scope)
-        best_a2 = tf.argmax(q2, axis=1)
-        best_q2 = gather_2d(q2_frozen, best_a2)
+        if self.double:
+            q2 = self.create_architecture(self.vars.state2_img, self.vars.state2_misc, trainable=True,
+                                          name_scope=self._name_scope, reuse=True)
+            best_a2 = tf.argmax(q2, axis=1)
+            best_q2 = gather_2d(q2_frozen, best_a2)
+        else:
+            best_q2 = tf.reduce_max(q2_frozen, axis=1)
 
         target_q = self.vars.r + (1 - tf.to_float(self.vars.terminal)) * self.gamma * best_q2
         target_q = tf.stop_gradient(target_q)

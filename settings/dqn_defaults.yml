@@ -7,6 +7,7 @@ run_tag: null
 
 # Network
 network_type: base_dqn
+double: true
 duelling: true
 prioritized_memory: true
 batchsize: 64
