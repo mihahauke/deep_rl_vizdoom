@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import json
+import ruamel.yaml as yaml
 from util.parsers import parse_train_a3c_args
 from util.coloring import green
 
@@ -58,13 +58,13 @@ if __name__ == "__main__":
     # TODO make tqdm work when stderr is redirected
     # TODO print setup info on stderr and stdout
     args = parse_train_a3c_args()
-    # TODO override settings according to args
 
-    default_settings_filepath = "settings/a3c/defaults.json"
-    override_settings_filepath = args.settings_json
-    a3c_settings = json.load(open(default_settings_filepath))
-    override_settings = json.load(open(override_settings_filepath))
-    a3c_settings.update(override_settings)
+    default_settings_filepath = "settings/a3c_defaults.yml"
+    a3c_settings = yaml.safe_load(open(default_settings_filepath))
+    for settings_fpath in args.settings_yml:
+        override_settings = yaml.safe_load(open(settings_fpath))
+        a3c_settings.update(override_settings)
+
     if not os.path.isdir(a3c_settings["models_path"]):
         os.makedirs(a3c_settings["models_path"])
     if not os.path.isdir(a3c_settings["logdir"]):

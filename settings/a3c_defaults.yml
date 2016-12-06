@@ -1,0 +1,39 @@
+config_file: basic.cfg
+models_path: models
+logdir: logs
+run_tag: null
+use_freedoom: false
+device: /gpu:0
+network_type: lstm_ac
+
+# General training options
+epochs: Inf
+local_steps_per_epoch: 1000
+test_episodes_per_epoch: 100
+run_tests: false
+
+# Vizdoom options
+display: false
+resolution: [ 80, 60 ]
+frame_skip: 4
+stack_n_frames: 4
+use_misc: true
+input_n_last_actions: false
+reward_scale: 1.0
+misc_sale: null
+
+
+
+threads_num: 16
+max_remembered_steps: 5
+initial_learning_rate: 0.0007
+final_learning_rate: 0.00001
+learning_rate_decay_steps: 10e07
+gamma: 0.99
+entropy_beta: 0.01
+rmsprop:
+  decay: 0.99
+  momentum: 0.0
+  clip_norm: 40.0
+
+

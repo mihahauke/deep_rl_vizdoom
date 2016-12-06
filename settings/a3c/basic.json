@@ -1,9 +1,0 @@
-{
-  "config_file": "basic.cfg",
-  "base_tag": "basic",
-  "network_type": "basic_lstm_ac",
-  "threads_num": 8,
-  "stack_n_frames": 4,
-  "reward_scale": 0.01,
-  "use_misc": false
-}

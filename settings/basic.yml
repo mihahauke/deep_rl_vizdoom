@@ -1,0 +1,3 @@
+config_file: basic.cfg
+base_tag: basic
+#reward_scale: 0.01

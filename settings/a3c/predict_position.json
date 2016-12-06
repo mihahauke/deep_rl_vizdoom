@@ -1,9 +1,0 @@
-{
-  "config_file": "predict_position.cfg",
-  "scenarios_path": "../benchmark_scenarios/scenarios",
-  "base_tag": "predict_position/",
-  "run_tag": null,
-  "threads_num": 16,
-  "network_type": "lstm_ac",
-  "run_tests": false
-}

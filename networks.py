@@ -42,7 +42,7 @@ class _BaseACNet(object):
         self.vars.state_img = tf.placeholder(tf.float32, [None] + list(img_shape), name="state_img")
         self.use_misc = misc_len > 0
         if self.use_misc:
-            self.vars.state_misc = tf.placeholder("float", [None, self._misc_len], name="state_misc")
+            self.vars.state_misc = tf.placeholder("float", [None, misc_len], name="state_misc")
         self._actions_num = actions_num
         self._name_scope = self._get_name_scope() + "_" + str(thread)
 
@@ -166,7 +166,7 @@ class _BaseRcurrentACNet(_BaseACNet):
     def create_architecture(self, **specs):
         self.vars.sequence_length = tf.placeholder(tf.float32, [1], name="sequence_length")
 
-        conv_layers = _default_conv_layers(self.vars.state_img, self._get_name_scope())
+        conv_layers = _default_conv_layers(self.vars.state_img, self._name_scope)
 
         if self.use_misc:
             fc_input = tf.concat(concat_dim=1, values=[conv_layers, self.vars.state_misc])

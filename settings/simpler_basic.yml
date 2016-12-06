@@ -1,0 +1,3 @@
+config_file: simpler_basic.cfg
+base_tag: simpler_basic
+#reward_scale: 0.01

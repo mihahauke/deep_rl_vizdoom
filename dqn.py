@@ -116,7 +116,7 @@ class DQN(object):
         session.run(tf.global_variables_initializer())
 
         # Prefill replay memory:
-        for _ in trange(self.replay_memory.capacity, leave=False, dest="Filling the memory"):
+        for _ in trange(self.replay_memory.capacity, leave=False, desc="Filling the memory"):
             if self.doom_wrapper.is_terminal():
                 self.doom_wrapper.reset()
             s1 = self.doom_wrapper.get_current_state()
@@ -156,7 +156,7 @@ class DQN(object):
 
             train_time = time() - train_start_time
 
-            print("Epoch", self._epoch)
+            print("Epoch", self._epoch, "epsilon:",self.get_current_epsilon())
             print("Training steps:", self.steps)
             self.print_epoch_log("TRAIN", train_scores, self.train_steps_per_epoch, train_time)
             test_start_time = time()
