@@ -65,7 +65,7 @@ class _BaseACNet(object):
         # TODO make it configurable from json
         with arg_scope([layers.conv2d], activation_fn=self.activation_fn, data_format="NCHW"), \
              arg_scope([layers.fully_connected], activation_fn=self.activation_fn):
-            self.create_architecture()
+            self.ops.pi, self.ops.v = self.create_architecture()
         self._prepare_loss_op()
         self._params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self._name_scope)
 
@@ -170,7 +170,7 @@ class _BaseRcurrentACNet(_BaseACNet):
                  recurrent_units_num=256,
                  **settings
                  ):
-        self._recurrent_cells = None
+        self.recurrent_cells = None
         self.network_state = None
         # TODO make it configurable in jsons
         self._recurrent_units_num = recurrent_units_num
@@ -195,11 +195,11 @@ class _BaseRcurrentACNet(_BaseACNet):
 
         fc1_reshaped = tf.reshape(fc1, [1, -1, self._recurrent_units_num])
 
-        self._recurrent_cells = self._get_ru_class()(self._recurrent_units_num)
-        state_c = tf.placeholder(tf.float32, [1, self._recurrent_cells.state_size.c], name="initial_lstm_state_c")
-        state_h = tf.placeholder(tf.float32, [1, self._recurrent_cells.state_size.h], name="initial_lstm_state_h")
+        self.recurrent_cells = self._get_ru_class()(self._recurrent_units_num)
+        state_c = tf.placeholder(tf.float32, [1, self.recurrent_cells.state_size.c], name="initial_lstm_state_c")
+        state_h = tf.placeholder(tf.float32, [1, self.recurrent_cells.state_size.h], name="initial_lstm_state_h")
         self.vars.initial_network_state = LSTMStateTuple(state_c, state_h)
-        lstm_outputs, self.ops.network_state = tf.nn.dynamic_rnn(self._recurrent_cells,
+        lstm_outputs, self.ops.network_state = tf.nn.dynamic_rnn(self.recurrent_cells,
                                                                  fc1_reshaped,
                                                                  initial_state=self.vars.initial_network_state,
                                                                  sequence_length=self.vars.sequence_length,
@@ -214,14 +214,12 @@ class _BaseRcurrentACNet(_BaseACNet):
         state_value = layers.linear(lstm_outputs, num_outputs=1, scope=self._name_scope + "/fc_value")
         v = tf.reshape(state_value, [-1])
 
-        self.ops.pi = pi
-        self.ops.v = v
         self.reset_state()
         return pi, v
 
     def reset_state(self):
-        state_c = np.zeros([1, self._recurrent_cells.state_size.c], dtype=np.float32)
-        state_h = np.zeros([1, self._recurrent_cells.state_size.h], dtype=np.float32)
+        state_c = np.zeros([1, self.recurrent_cells.state_size.c], dtype=np.float32)
+        state_h = np.zeros([1, self.recurrent_cells.state_size.h], dtype=np.float32)
         self.network_state = LSTMStateTuple(state_c, state_h)
 
     def _get_standard_feed_dict(self, state):
@@ -236,26 +234,29 @@ class _BaseRcurrentACNet(_BaseACNet):
             feed_dict[self.vars.state_misc] = misc
         return feed_dict
 
-    def get_policy_and_value(self, sess, state):
+    def get_policy_and_value(self, sess, state, update_state=True):
         # This run_policy_and_value() is used when forward propagating.
         # so the step size is 1.
-        policy, value, self.network_state = sess.run([self.ops.pi, self.ops.v, self.ops.network_state],
-                                                     feed_dict=self._get_standard_feed_dict(state))
+        policy, value, new_network_state = sess.run([self.ops.pi, self.ops.v, self.ops.network_state],
+                                                    feed_dict=self._get_standard_feed_dict(state))
+        if update_state:
+            self.network_state = new_network_state
         # pi_out: (1,3), v_out: (1)
         return policy[0], value[0]
 
-    def get_policy(self, sess, state):
-        policy, self.network_state = sess.run([self.ops.pi, self.ops.network_state],
-                                              feed_dict=self._get_standard_feed_dict(state))
+    def get_policy(self, sess, state, update_state=True):
+        policy, new_network_state = sess.run([self.ops.pi, self.ops.network_state],
+                                             feed_dict=self._get_standard_feed_dict(state))
+        if update_state:
+            self.network_state = new_network_state
         return policy[0]
 
-    def get_value(self, sess, state, retain_net_state=True):
-        if retain_net_state:
-            initial_network_sate = self.network_state
-        v = super(_BaseRcurrentACNet, self).get_value(sess, state)
-
-        if retain_net_state:
-            self.network_state = initial_network_sate
+    def get_value(self, sess, state, update_state=False):
+        if update_state:
+            v, self.network_state = sess.run([self.ops.v, self.ops.network_state],
+                                             feed_dict=self._get_standard_feed_dict(state))
+        else:
+            v = super(_BaseRcurrentACNet, self).get_value(sess, state)
         return v
 
     def get_current_network_state(self):
