@@ -105,7 +105,9 @@ class DQN(object):
 
     def train(self):
         # Maybe make use of the fact that it's interactive
-        session = tf.InteractiveSession()
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        session = tf.InteractiveSession(config=config)
         session.run(tf.global_variables_initializer())
 
         # Prefill replay memory:

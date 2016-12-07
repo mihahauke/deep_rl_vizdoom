@@ -3,4 +3,5 @@ scenarios_path: ../benchmark_scenarios/scenarios
 base_tag: healthg
 run_tag: null
 frame_skip: 10
-misc_scale: [0.01]
+input_n_last_actions: 4
+#misc_scale: [0.01]
