@@ -292,6 +292,12 @@ class LstmACACNet(_BaseRcurrentACNet):
         return tf.nn.rnn_cell.LSTMCell
 
 
+# Asynchronous n-step q learning nets:
+class _BaseAQNet(_BaseACNet):
+    # TODO
+    pass
+
+
 # DQN nets:
 
 class BaseDQNNet(object):
@@ -448,45 +454,22 @@ class DuelingDQNNet(BaseDQNNet):
             return q_op
 
 
-# TODO make a module and move this methods somewhere else?
-def get_available_ac_networks():
+def get_available_networks():
     nets = []
     for member in inspect.getmembers(sys.modules[__name__]):
         if inspect.isclass(member[1]):
             member_name = member[0]
-            if member_name.endswith("ACNet") and not member_name.startswith("_"):
+            if member_name.endswith("Net") and not member_name.startswith("_"):
                 nets.append(member)
     return nets
 
 
-def get_available_dqn_networks():
-    nets = []
-    for member in inspect.getmembers(sys.modules[__name__]):
-        if inspect.isclass(member[1]):
-            member_name = member[0]
-            if member_name.endswith("DQNNet") and not member_name.startswith("_"):
-                nets.append(member)
-    return nets
-
-
-def create_ac_network(network_type, **args):
-    _short_names = {FFACNet: "ff_ac", BasicLstmACACNet: "basic_lstm_ac", LstmACACNet: "lstm_ac"}
+def create_network(network_type, **args):
+    _short_names = {FFACNet: "ff_ac", BasicLstmACACNet: "basic_lstm_ac", LstmACACNet: "lstm_ac", BaseDQNNet: "base_dqn",
+                    DuelingDQNNet: "duelling_dqn"}
     _inv_short_names = {v: k for k, v in _short_names.items()}
     if network_type is not None:
-        for mname, mclass in get_available_ac_networks():
-            if network_type == mname:
-                return mclass(**args)
-        if network_type in _inv_short_names:
-            return _inv_short_names[network_type](**args)
-
-    raise ValueError("Unsupported net: {}".format(network_type))
-
-
-def create_dqn_network(network_type, **args):
-    _short_names = {BaseDQNNet: "base_dqn", DuelingDQNNet: "duelling_dqn"}
-    _inv_short_names = {v: k for k, v in _short_names.items()}
-    if network_type is not None:
-        for mname, mclass in get_available_ac_networks():
+        for mname, mclass in get_available_networks():
             if network_type == mname:
                 return mclass(**args)
         if network_type in _inv_short_names:

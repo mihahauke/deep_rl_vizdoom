@@ -5,7 +5,7 @@ import numpy as np
 import random
 import time
 from vizdoom_wrapper import VizdoomWrapper
-from networks import create_ac_network
+from networks import create_network
 from tqdm import trange
 from threading import Thread
 from util.coloring import red, green, blue
@@ -23,7 +23,7 @@ class A3CLearner(Thread):
         super(A3CLearner, self).__init__()
 
         print("Creating actor-learner #{}.".format(thread_index))
-        self.index = thread_index
+        self.thread_index = thread_index
         self.write_summaries = write_summaries
         self._settings = settings
         date_string = strftime("%d.%m.%y-%H:%M")
@@ -44,8 +44,8 @@ class A3CLearner(Thread):
 
         self.actions_num = self.doom_wrapper.actions_num
 
-        self.local_network = create_ac_network(actions_num=self.actions_num, img_shape=img_shape, misc_len=misc_len,
-                                               thread=thread_index, **settings)
+        self.local_network = create_network(actions_num=self.actions_num, img_shape=img_shape, misc_len=misc_len,
+                                            thread=thread_index, **settings)
 
         # TODO check gate_gradients != Optimizer.GATE_OP
         grads_and_vars = optimizer.compute_gradients(self.local_network.ops.loss,
@@ -66,7 +66,7 @@ class A3CLearner(Thread):
         self._test_writer = None
         self._summaries = None
 
-        if self.index == 0:
+        if self.thread_index == 0:
             # TODO get std, min and max - use lists instead od scalars
             self._model_savefile = settings["models_path"] + "/" + self._run_string
             if self.write_summaries:
@@ -130,7 +130,7 @@ class A3CLearner(Thread):
             self.local_steps += 1
             if terminal:
                 terminal_end = True
-                if self.index == 0:
+                if self.thread_index == 0:
                     self.train_scores.append(self.doom_wrapper.get_total_reward())
                 self.doom_wrapper.reset()
                 if self.local_network.has_state():
@@ -240,7 +240,7 @@ class A3CLearner(Thread):
                 if self.steps_per_epoch * self._epoch <= self.local_steps:
                     self._epoch += 1
 
-                    if self.index == 0:
+                    if self.thread_index == 0:
                         self._print_log(self.train_scores, overall_start_time, last_log_time, local_steps_for_log)
                         mean_train_score = np.mean(self.train_scores)
                         self.train_scores = []
@@ -261,10 +261,10 @@ class A3CLearner(Thread):
                         print()
 
         except (SignalException, ViZDoomUnexpectedExitException):
-            threadsafe_print(red("Thread #{} aborting(ViZDoom killed).".format(self.index)))
+            threadsafe_print(red("Thread #{} aborting(ViZDoom killed).".format(self.thread_index)))
 
     def run_training(self, session, global_steps_counter):
-        if self.index == 0:
+        if self.thread_index == 0:
             # TODO make including sesion.graph optional
             logdir = self._settings["logdir"]
             if self._settings["run_tag"] is not None:

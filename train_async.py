@@ -11,7 +11,7 @@ def train_a3c(settings):
     import tensorflow as tf
     from async_learner import A3CLearner
     from vizdoom_wrapper import VizdoomWrapper
-    from networks import create_ac_network
+    from networks import create_network
     from util import ThreadsafeCounter
     from util.optimizers import ClippingRMSPropOptimizer
 
@@ -20,7 +20,7 @@ def train_a3c(settings):
     misc_len = tmpVizdoomWrapper.misc_len
     img_shape = tmpVizdoomWrapper.img_shape
     tmpVizdoomWrapper = None
-    global_network = create_ac_network(actions_num=actions_num, misc_len=misc_len, img_shape=img_shape, **settings)
+    global_network = create_network(actions_num=actions_num, misc_len=misc_len, img_shape=img_shape, **settings)
 
     # This global step counts gradient applications not performed actions.
     global_train_step = tf.Variable(0, trainable=False, name="global_step")
