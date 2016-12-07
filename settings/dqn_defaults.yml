@@ -6,7 +6,8 @@ logdir: logs
 run_tag: null
 
 # Network
-network_type: base_dqn
+network_type: dqn
+activation_fn: tf.nn.relu
 double: true
 duelling: true
 prioritized_memory: true
