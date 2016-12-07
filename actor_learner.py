@@ -122,8 +122,7 @@ class ActorLearner(Thread):
             values_reversed.insert(0, state_value)
             states_img.append(current_img)
             states_misc.append(current_misc)
-            actions.append(np.zeros([self.actions_num], dtype=np.float32))
-            actions[-1][action_index] = 1
+            actions.append(action_index)
             reward = self.doom_wrapper.make_action(action_index)
             terminal = self.doom_wrapper.is_terminal()
 

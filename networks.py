@@ -81,15 +81,17 @@ class _BaseACNet(object):
         return tf.group(*sync_ops, name=name)
 
     def _prepare_loss_op(self):
-        self.vars.a = tf.placeholder(tf.float32, [None, self._actions_num], name="action")
+        # TODO use gather2d instead of one hot action
+        self.vars.a = tf.placeholder(tf.float32, [None], name="action")
         self.vars.advantage = tf.placeholder(tf.float32, [None], name="advantage")
         self.vars.R = tf.placeholder(tf.float32, [None], name="R")
         # TODO add summaries for entropy, policy and value
+
         log_pi = tf.log(tf.clip_by_value(self.ops.pi, 1e-20, 1.0))
-        entropy = -tf.reduce_sum(self.ops.pi * log_pi, reduction_indices=1)
-        policy_loss = - tf.reduce_sum(
-            tf.reduce_sum(tf.mul(log_pi, self.vars.a),
-                          reduction_indices=1) * self.vars.advantage + entropy * self._entropy_beta)
+        entropy = -tf.reduce_sum(self.ops.pi * log_pi)
+        chosen_pi_log = gather_2d(log_pi, self.vars.a)
+
+        policy_loss = - tf.reduce_sum(chosen_pi_log * self.vars.advantage) + entropy * self._entropy_beta
         value_loss = 0.5 * tf.reduce_sum(tf.squared_difference(self.vars.R, self.ops.v))
 
         self.ops.loss = policy_loss + value_loss
