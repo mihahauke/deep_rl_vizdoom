@@ -35,25 +35,19 @@ class _BaseACNet(object):
         self._params = None
         self._entropy_beta = entropy_beta
 
-        self.ops.sync = self._sync_op
-
-        # TODO make it configurable from json
+        # TODO make it configurable from yaml
         with arg_scope([layers.conv2d], activation_fn=self.activation_fn, data_format="NCHW"), \
              arg_scope([layers.fully_connected], activation_fn=self.activation_fn):
             self.ops.pi, self.ops.v = self.create_architecture()
         self._prepare_loss_op()
         self._params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self._name_scope)
 
-    def _sync_op(self, src_network, name=None):
-        src_vars = src_network.get_params()
-        dst_vars = self.get_params()
+    def prepare_sync_op(self, global_network):
+        global_params = global_network.get_params()
+        local_params = self.get_params()
+        sync_ops = [tf.assign(dst_var, src_var) for src_var, dst_var in zip(global_params, local_params)]
 
-        sync_ops = []
-        for src_var, dst_var in zip(src_vars, dst_vars):
-            sync_op = tf.assign(dst_var, src_var)
-            sync_ops.append(sync_op)
-
-        return tf.group(*sync_ops, name=name)
+        self.ops.sync = tf.group(*sync_ops, name="SyncWithGlobal")
 
     def _prepare_loss_op(self):
         # TODO use gather2d instead of one hot action
@@ -245,6 +239,7 @@ class _BaseRcurrentACNet(_BaseACNet):
 
 class BasicLstmACACNet(_BaseRcurrentACNet):
     shortname = "basic_lstm_ac"
+
     def __init__(self,
                  **settings
                  ):
@@ -259,6 +254,7 @@ class BasicLstmACACNet(_BaseRcurrentACNet):
 
 class LstmACACNet(_BaseRcurrentACNet):
     shortname = "lstm_ac"
+
     def __init__(self,
                  **settings
                  ):

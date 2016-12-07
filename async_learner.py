@@ -54,8 +54,7 @@ class A3CLearner(Thread):
         grads_and_global_vars = zip(grads, global_network.get_params())
 
         self.train_op = optimizer.apply_gradients(grads_and_global_vars, global_step=tf.train.get_global_step())
-        # TODO create prepare_sync_op and run self.network.ops.sync later
-        self.sync_op = self.local_network.ops.sync(global_network)
+        self.local_network.prepare_sync_op(global_network)
 
         self.local_steps = 0
         # TODO epoch as tf variable?
@@ -85,12 +84,12 @@ class A3CLearner(Thread):
         if deterministic:
             return np.argmax(policy)
 
-        # TODO the sum should be 1 so ...
-        r = random.random() * np.sum(policy)
+        r = random.random()
         cummulative_sum = 0.0
         for i, p in enumerate(policy):
             cummulative_sum += p
             if r <= cummulative_sum:
+                np.set_printoptions(precision=3)
                 return i
 
         return len(policy) - 1
@@ -106,7 +105,7 @@ class A3CLearner(Thread):
 
         terminal_end = False
 
-        self._session.run(self.sync_op)
+        self._session.run(self.local_network.ops.sync)
 
         initial_network_state = None
         # TODO add remember state or sumtin

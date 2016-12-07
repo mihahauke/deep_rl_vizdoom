@@ -76,10 +76,11 @@ class DQN(object):
         self.epsilon_decay_rate = (initial_epsilon - final_epsilon) / epsilon_decay_steps
         self.epsilon_decay_start_step = epsilon_decay_start_step
         self.initial_epsilon = initial_epsilon
+        self.final_epsilon = final_epsilon
 
     def get_current_epsilon(self):
         eps = self.initial_epsilon - (self.steps - self.epsilon_decay_start_step) * self.epsilon_decay_rate
-        return np.clip(eps, 0, 1.0)
+        return np.clip(eps, self.final_epsilon, 1.0)
 
     def print_epoch_log(self, prefix, scores, steps, epoch_time):
         mean_score = np.mean(scores)
