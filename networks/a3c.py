@@ -35,9 +35,9 @@ class _BaseACNet(object):
         self._params = None
         self._entropy_beta = entropy_beta
 
-        # TODO make it configurable from yaml
-        with arg_scope([layers.conv2d], activation_fn=self.activation_fn, data_format="NCHW"), \
-             arg_scope([layers.fully_connected], activation_fn=self.activation_fn):
+        with arg_scope([layers.conv2d], data_format="NCHW"), \
+             arg_scope([layers.fully_connected, layers.conv2d], activation_fn=self.activation_fn):
+            # TODO make it configurable from yaml
             self.ops.pi, self.ops.v = self.create_architecture()
         self._prepare_loss_op()
         self._params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self._name_scope)
@@ -72,8 +72,8 @@ class _BaseACNet(object):
         raise NotImplementedError()
 
     def get_policy_and_value(self, sess, state):
-        pi_out, v_out = sess.run([self.ops.pi, self.ops.v], feed_dict=self._get_standard_feed_dict(state))
-        return pi_out[0], v_out[0]
+        pi, v = sess.run([self.ops.pi, self.ops.v], feed_dict=self._get_standard_feed_dict(state))
+        return pi[0], v[0]
 
     def get_policy(self, sess, state):
         pi_out = sess.run(self.ops.pi, feed_dict=self._get_standard_feed_dict(state))
@@ -121,8 +121,6 @@ class FFACNet(_BaseACNet):
 
         v = tf.reshape(state_value, [-1])
 
-        self.ops.pi = pi
-        self.ops.v = v
         return pi, v
 
     def _get_standard_feed_dict(self, state):
@@ -151,10 +149,9 @@ class _BaseRcurrentACNet(_BaseACNet):
         raise NotImplementedError()
 
     def create_architecture(self, **specs):
-        self.vars.sequence_length = tf.placeholder(tf.float32, [1], name="sequence_length")
+        self.vars.sequence_length = tf.placeholder(tf.int64, [1], name="sequence_length")
 
         conv_layers = default_conv_layers(self.vars.state_img, self._name_scope)
-
         if self.use_misc:
             fc_input = tf.concat(concat_dim=1, values=[conv_layers, self.vars.state_misc])
         else:
@@ -165,24 +162,22 @@ class _BaseRcurrentACNet(_BaseACNet):
                                      biases_initializer=tf.constant_initializer(0.1))
 
         fc1_reshaped = tf.reshape(fc1, [1, -1, self._recurrent_units_num])
-
         self.recurrent_cells = self._get_ru_class()(self._recurrent_units_num)
         state_c = tf.placeholder(tf.float32, [1, self.recurrent_cells.state_size.c], name="initial_lstm_state_c")
         state_h = tf.placeholder(tf.float32, [1, self.recurrent_cells.state_size.h], name="initial_lstm_state_h")
         self.vars.initial_network_state = LSTMStateTuple(state_c, state_h)
-        lstm_outputs, self.ops.network_state = tf.nn.dynamic_rnn(self.recurrent_cells,
-                                                                 fc1_reshaped,
-                                                                 initial_state=self.vars.initial_network_state,
-                                                                 sequence_length=self.vars.sequence_length,
-                                                                 time_major=False,
-                                                                 scope=self._name_scope)
+        rnn_outputs, self.ops.network_state = tf.nn.dynamic_rnn(self.recurrent_cells,
+                                                                fc1_reshaped,
+                                                                initial_state=self.vars.initial_network_state,
+                                                                sequence_length=self.vars.sequence_length,
+                                                                time_major=False,
+                                                                scope=self._name_scope)
+        reshaped_rnn_outputs = tf.reshape(rnn_outputs, [-1, self._recurrent_units_num])
 
-        lstm_outputs = tf.reshape(lstm_outputs, [-1, self._recurrent_units_num])
-
-        pi = layers.fully_connected(lstm_outputs, num_outputs=self._actions_num,
+        pi = layers.fully_connected(reshaped_rnn_outputs, num_outputs=self._actions_num,
                                     scope=self._name_scope + "/fc_pi",
                                     activation_fn=tf.nn.softmax)
-        state_value = layers.linear(lstm_outputs, num_outputs=1, scope=self._name_scope + "/fc_value")
+        state_value = layers.linear(reshaped_rnn_outputs, num_outputs=1, scope=self._name_scope + "/fc_value")
         v = tf.reshape(state_value, [-1])
 
         self.reset_state()
@@ -206,21 +201,20 @@ class _BaseRcurrentACNet(_BaseACNet):
         return feed_dict
 
     def get_policy_and_value(self, sess, state, update_state=True):
-        # This run_policy_and_value() is used when forward propagating.
-        # so the step size is 1.
-        policy, value, new_network_state = sess.run([self.ops.pi, self.ops.v, self.ops.network_state],
-                                                    feed_dict=self._get_standard_feed_dict(state))
         if update_state:
-            self.network_state = new_network_state
-        # pi_out: (1,3), v_out: (1)
-        return policy[0], value[0]
+            pi, v, self.network_state = sess.run([self.ops.pi, self.ops.v, self.ops.network_state],
+                                                 feed_dict=self._get_standard_feed_dict(state))
+        else:
+            pi, v = super(_BaseRcurrentACNet, self).get_policy_and_value(sess, state)
+        return pi[0], v[0]
 
     def get_policy(self, sess, state, update_state=True):
-        policy, new_network_state = sess.run([self.ops.pi, self.ops.network_state],
-                                             feed_dict=self._get_standard_feed_dict(state))
         if update_state:
-            self.network_state = new_network_state
-        return policy[0]
+            pi = self.network_state = sess.run([self.ops.pi, self.ops.network_state],
+                                               feed_dict=self._get_standard_feed_dict(state))
+        else:
+            pi = super(_BaseRcurrentACNet, self).get_policy(sess, state)
+        return pi[0]
 
     def get_value(self, sess, state, update_state=False):
         if update_state:
@@ -246,7 +240,7 @@ class BasicLstmACACNet(_BaseRcurrentACNet):
         super(BasicLstmACACNet, self).__init__(**settings)
 
     def _get_name_scope(self):
-        return "a3c_basic_lstm_net"
+        return BasicLstmACACNet.shortname
 
     def _get_ru_class(self):
         return tf.nn.rnn_cell.BasicLSTMCell
@@ -261,7 +255,7 @@ class LstmACACNet(_BaseRcurrentACNet):
         super(LstmACACNet, self).__init__(**settings)
 
     def _get_name_scope(self):
-        return "a3c_lstm_net"
+        return LstmACACNet.shortname
 
     def _get_ru_class(self):
         return tf.nn.rnn_cell.LSTMCell

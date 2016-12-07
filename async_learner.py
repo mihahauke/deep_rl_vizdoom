@@ -112,6 +112,7 @@ class A3CLearner(Thread):
         if self.local_network.has_state():
             initial_network_state = self.local_network.get_current_network_state()
 
+        terminal = None
         steps_performed = 0
         for _ in range(self.max_remembered_steps):
             steps_performed += 1
@@ -128,7 +129,6 @@ class A3CLearner(Thread):
             rewards_reversed.insert(0, reward)
             self.local_steps += 1
             if terminal:
-                terminal_end = True
                 if self.thread_index == 0:
                     self.train_scores.append(self.doom_wrapper.get_total_reward())
                 self.doom_wrapper.reset()
@@ -136,7 +136,7 @@ class A3CLearner(Thread):
                     self.local_network.reset_state()
                 break
 
-        if terminal_end:
+        if terminal:
             R = 0.0
         else:
             R = self.local_network.get_value(self._session, self.doom_wrapper.get_current_state())
