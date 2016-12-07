@@ -9,7 +9,7 @@ import os
 
 def train_a3c(settings):
     import tensorflow as tf
-    from actor_learner import ActorLearner
+    from async_learner import A3CLearner
     from vizdoom_wrapper import VizdoomWrapper
     from networks import create_ac_network
     from util import ThreadsafeCounter
@@ -33,7 +33,7 @@ def train_a3c(settings):
 
     actor_learners = []
     for i in range(settings["threads_num"]):
-        actor_learner = ActorLearner(thread_index=i, global_network=global_network, optimizer=optimizer, **settings)
+        actor_learner = A3CLearner(thread_index=i, global_network=global_network, optimizer=optimizer, **settings)
         actor_learners.append(actor_learner)
 
     config = tf.ConfigProto()

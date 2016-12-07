@@ -13,14 +13,14 @@ from time import strftime
 import tensorflow as tf
 
 
-class ActorLearner(Thread):
+class A3CLearner(Thread):
     def __init__(self,
                  thread_index,
                  global_network,
                  optimizer,
                  write_summaries=True,
                  **settings):
-        super(ActorLearner, self).__init__()
+        super(A3CLearner, self).__init__()
 
         print("Creating actor-learner #{}.".format(thread_index))
         self.index = thread_index
@@ -118,7 +118,7 @@ class ActorLearner(Thread):
             steps_performed += 1
             current_img, current_misc = self.doom_wrapper.get_current_state()
             policy, state_value = self.local_network.get_policy_and_value(self._session, [current_img, current_misc])
-            action_index = ActorLearner.choose_action_index(policy)
+            action_index = A3CLearner.choose_action_index(policy)
             values_reversed.insert(0, state_value)
             states_img.append(current_img)
             states_misc.append(current_misc)
