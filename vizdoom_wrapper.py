@@ -4,7 +4,6 @@ import itertools as it
 import vizdoom as vzd
 import os
 import cv2
-from util.mock_vizdoom import MockDoomGame
 
 
 class VizdoomWrapper(object):
@@ -21,23 +20,20 @@ class VizdoomWrapper(object):
                  use_misc=True,
                  misc_scale=None,
                  scenarios_path=os.path.join(vzd.__path__[0], "scenarios"),
-                 mock=False,
                  **kwargs):
-        if mock:
-            doom = MockDoomGame()
-        else:
-            doom = vzd.DoomGame()
 
-            if use_freedoom:
-                doom.set_doom_game_path(vzd.__path__[0] + "/freedoom2.wad")
+        doom = vzd.DoomGame()
 
-            doom.load_config(os.path.join(scenarios_path, str(config_file)))
-            doom.set_window_visible(display)
-            # TODO support for colors
-            doom.set_screen_format(vzd.ScreenFormat.GRAY8)
-            doom.set_screen_resolution(vzd.ScreenResolution.RES_160X120)
-            if not noinit:
-                doom.init()
+        if use_freedoom:
+            doom.set_doom_game_path(vzd.__path__[0] + "/freedoom2.wad")
+
+        doom.load_config(os.path.join(scenarios_path, str(config_file)))
+        doom.set_window_visible(display)
+        # TODO support for colors
+        doom.set_screen_format(vzd.ScreenFormat.GRAY8)
+        doom.set_screen_resolution(vzd.ScreenResolution.RES_160X120)
+        if not noinit:
+            doom.init()
         self.doom = doom
 
         self._stack_n_frames = stack_n_frames

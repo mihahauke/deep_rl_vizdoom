@@ -5,7 +5,7 @@ import tensorflow as tf
 from time import strftime
 
 from vizdoom_wrapper import VizdoomWrapper
-from networks import create_dqn_network
+from networks import create_network
 from tqdm import trange
 from random import random, randint
 from replay_memory import ReplayMemory
@@ -52,7 +52,7 @@ class DQN(object):
         self.use_misc = self.doom_wrapper.use_misc
         self.actions_num = self.doom_wrapper.actions_num
         self.replay_memory = ReplayMemory(img_shape, misc_len, batch_size=batchsize, capacity=memory_capacity)
-        self.network = create_dqn_network(actions_num=self.actions_num, img_shape=img_shape, misc_len=misc_len,
+        self.network = create_network(actions_num=self.actions_num, img_shape=img_shape, misc_len=misc_len,
                                           **settings)
 
         self.batchsize = batchsize
@@ -111,7 +111,7 @@ class DQN(object):
         session.run(tf.global_variables_initializer())
 
         # Prefill replay memory:
-        for _ in trange(self.replay_memory.capacity, leave=False, desc="Filling the memory"):
+        for _ in trange(self.replay_memory.capacity, leave=False, desc="Filling replay memory."):
             if self.doom_wrapper.is_terminal():
                 self.doom_wrapper.reset()
             s1 = self.doom_wrapper.get_current_state()

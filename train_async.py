@@ -19,7 +19,7 @@ def train_a3c(settings):
     actions_num = tmpVizdoomWrapper.actions_num
     misc_len = tmpVizdoomWrapper.misc_len
     img_shape = tmpVizdoomWrapper.img_shape
-    tmpVizdoomWrapper = None
+    del tmpVizdoomWrapper
     global_network = create_network(actions_num=actions_num, misc_len=misc_len, img_shape=img_shape, **settings)
 
     # This global step counts gradient applications not performed actions.
@@ -45,6 +45,7 @@ def train_a3c(settings):
     print("Initialization finished.")
     global_steps_counter = ThreadsafeCounter()
 
+    # TODO print settings
     print(green("Launching training."))
     for l in actor_learners:
         l.run_training(session=session, global_steps_counter=global_steps_counter)
