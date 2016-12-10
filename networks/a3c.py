@@ -42,6 +42,14 @@ class _BaseACNet(object):
         self._prepare_loss_op()
         self._params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self._name_scope)
 
+    def policy_value_layer(self, inputs):
+        pi = layers.fully_connected(inputs, num_outputs=self._actions_num,
+                                    scope=self._name_scope + "/fc_pi",
+                                    activation_fn=tf.nn.softmax)
+        state_value = layers.linear(inputs, num_outputs=1, scope=self._name_scope + "/fc_value")
+        v = tf.reshape(state_value, [-1])
+        return pi, v
+
     def prepare_sync_op(self, global_network):
         global_params = global_network.get_params()
         local_params = self.get_params()
@@ -68,19 +76,26 @@ class _BaseACNet(object):
     def create_architecture(self, **specs):
         raise NotImplementedError()
 
-    def _get_standard_feed_dict(self, state):
-        raise NotImplementedError()
+    def get_standard_feed_dict(self, state):
+        feed_dict = {self.vars.state_img: [state[0]]}
+        if self.use_misc > 0:
+            if len(state[1].shape) == 1:
+                misc = state[1].reshape([1, -1])
+            else:
+                misc = state[1]
+            feed_dict[self.vars.state_misc] = misc
+        return feed_dict
 
     def get_policy_and_value(self, sess, state):
-        pi, v = sess.run([self.ops.pi, self.ops.v], feed_dict=self._get_standard_feed_dict(state))
+        pi, v = sess.run([self.ops.pi, self.ops.v], feed_dict=self.get_standard_feed_dict(state))
         return pi[0], v[0]
 
     def get_policy(self, sess, state):
-        pi_out = sess.run(self.ops.pi, feed_dict=self._get_standard_feed_dict(state))
+        pi_out = sess.run(self.ops.pi, feed_dict=self.get_standard_feed_dict(state))
         return pi_out[0]
 
     def get_value(self, sess, state):
-        v = sess.run(self.ops.v, feed_dict=self._get_standard_feed_dict(state))
+        v = sess.run(self.ops.v, feed_dict=self.get_standard_feed_dict(state))
         return v[0]
 
     def get_params(self):
@@ -114,24 +129,7 @@ class FFACNet(_BaseACNet):
         fc1 = layers.fully_connected(fc_input, num_outputs=512, scope=self._name_scope + "/fc1",
                                      biases_initializer=tf.constant_initializer(0.1))
 
-        pi = layers.fully_connected(fc1, num_outputs=self._actions_num, scope=self._name_scope + "/fc_pi",
-                                    activation_fn=tf.nn.softmax)
-
-        state_value = layers.linear(fc1, num_outputs=1, scope=self._name_scope + "/fc_value")
-
-        v = tf.reshape(state_value, [-1])
-
-        return pi, v
-
-    def _get_standard_feed_dict(self, state):
-        feed_dict = {self.vars.state_img: [state[0]]}
-        if self.use_misc > 0:
-            if len(state[1].shape) == 1:
-                misc = state[1].reshape([1, -1])
-            else:
-                misc = state[1]
-            feed_dict[self.vars.state_misc] = misc
-        return feed_dict
+        return self.policy_value_layer(fc1)
 
 
 class _BaseRcurrentACNet(_BaseACNet):
@@ -174,52 +172,42 @@ class _BaseRcurrentACNet(_BaseACNet):
                                                                 scope=self._name_scope)
         reshaped_rnn_outputs = tf.reshape(rnn_outputs, [-1, self._recurrent_units_num])
 
-        pi = layers.fully_connected(reshaped_rnn_outputs, num_outputs=self._actions_num,
-                                    scope=self._name_scope + "/fc_pi",
-                                    activation_fn=tf.nn.softmax)
-        state_value = layers.linear(reshaped_rnn_outputs, num_outputs=1, scope=self._name_scope + "/fc_value")
-        v = tf.reshape(state_value, [-1])
-
         self.reset_state()
-        return pi, v
+        return self.policy_value_layer(reshaped_rnn_outputs)
 
     def reset_state(self):
         state_c = np.zeros([1, self.recurrent_cells.state_size.c], dtype=np.float32)
         state_h = np.zeros([1, self.recurrent_cells.state_size.h], dtype=np.float32)
         self.network_state = LSTMStateTuple(state_c, state_h)
 
-    def _get_standard_feed_dict(self, state):
-        feed_dict = {self.vars.state_img: [state[0]],
-                     self.vars.initial_network_state: self.network_state,
-                     self.vars.sequence_length: [1]}
-        if self.use_misc > 0:
-            if len(state[1].shape) == 1:
-                misc = state[1].reshape([1, -1])
-            else:
-                misc = state[1]
-            feed_dict[self.vars.state_misc] = misc
+    def get_standard_feed_dict(self, state):
+        feed_dict = super(_BaseRcurrentACNet, self).get_standard_feed_dict(state)
+        feed_dict[self.vars.initial_network_state] = self.network_state,
+        feed_dict[self.vars.sequence_length] = [1]
         return feed_dict
 
     def get_policy_and_value(self, sess, state, update_state=True):
         if update_state:
             pi, v, self.network_state = sess.run([self.ops.pi, self.ops.v, self.ops.network_state],
-                                                 feed_dict=self._get_standard_feed_dict(state))
+                                                 feed_dict=self.get_standard_feed_dict(state))
         else:
             pi, v = super(_BaseRcurrentACNet, self).get_policy_and_value(sess, state)
         return pi[0], v[0]
 
     def get_policy(self, sess, state, update_state=True):
+        old_state = self.network_state.c.copy(), self.network_state.h.copy()
         if update_state:
-            pi = self.network_state = sess.run([self.ops.pi, self.ops.network_state],
-                                               feed_dict=self._get_standard_feed_dict(state))
+            pi, self.network_state = sess.run([self.ops.pi, self.ops.network_state],
+                                              feed_dict=self.get_standard_feed_dict(state))
         else:
             pi = super(_BaseRcurrentACNet, self).get_policy(sess, state)
+
         return pi[0]
 
     def get_value(self, sess, state, update_state=False):
         if update_state:
             v, self.network_state = sess.run([self.ops.v, self.ops.network_state],
-                                             feed_dict=self._get_standard_feed_dict(state))
+                                             feed_dict=self.get_standard_feed_dict(state))
         else:
             v = super(_BaseRcurrentACNet, self).get_value(sess, state)
         return v

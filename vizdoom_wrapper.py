@@ -21,7 +21,6 @@ class VizdoomWrapper(object):
                  misc_scale=None,
                  scenarios_path=os.path.join(vzd.__path__[0], "scenarios"),
                  **kwargs):
-
         doom = vzd.DoomGame()
 
         if use_freedoom:
@@ -49,7 +48,6 @@ class VizdoomWrapper(object):
         self.actions_num = len(self._actions)
         self._current_screen = None
         self._current_stacked_screen = np.zeros(self.img_shape, dtype=np.float32)
-        self._last_reward = None
 
         self._current_stacked_misc = None
         self.input_n_last_actions = 0
@@ -109,9 +107,6 @@ class VizdoomWrapper(object):
 
     def reset(self):
         self.doom.new_episode()
-
-        self._last_reward = 0
-
         self._current_stacked_screen = np.zeros_like(self._current_stacked_screen)
         self._update_screen()
 
@@ -123,8 +118,7 @@ class VizdoomWrapper(object):
 
     def make_action(self, action_index):
         action = self._actions[action_index]
-        self._last_reward = self.doom.make_action(action, self._frame_skip) * self._reward_scale
-
+        reward = self.doom.make_action(action, self._frame_skip) * self._reward_scale
         if not self.doom.is_episode_finished():
             if self.input_n_last_actions:
                 self.last_n_actions[0:-self.actions_num] = self.last_n_actions[self.actions_num:]
@@ -136,7 +130,7 @@ class VizdoomWrapper(object):
             if self.use_misc:
                 self._update_misc()
 
-        return self._last_reward
+        return reward
 
     def get_current_state(self):
         return self._current_stacked_screen, self._current_stacked_misc
@@ -146,9 +140,6 @@ class VizdoomWrapper(object):
 
     def is_terminal(self):
         return self.doom.is_episode_finished()
-
-    def get_last_reward(self):
-        return self._last_reward
 
     def close(self):
         self.doom.close()

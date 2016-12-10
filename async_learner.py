@@ -89,7 +89,6 @@ class A3CLearner(Thread):
         for i, p in enumerate(policy):
             cummulative_sum += p
             if r <= cummulative_sum:
-                np.set_printoptions(precision=3)
                 return i
 
         return len(policy) - 1
@@ -103,8 +102,7 @@ class A3CLearner(Thread):
         advantages = []
         Rs = []
 
-        terminal_end = False
-
+        # TODO use default session
         self._session.run(self.local_network.ops.sync)
 
         initial_network_state = None
@@ -145,6 +143,7 @@ class A3CLearner(Thread):
             R = ri + self.gamma * R
             advantages.insert(0, R - Vi)
             Rs.insert(0, R)
+        np.set_printoptions(precision=3)
 
         # TODO delegate this to the network as train_batch(session, ...)
         train_op_feed_dict = {
@@ -211,13 +210,13 @@ class A3CLearner(Thread):
         global_steps_per_sec = global_steps / elapsed_time
         global_mil_steps_per_hour = global_steps_per_sec * 3600 / 1000000.0
         print(
-            "TRAIN: mean: {}, min: {}, max: {}, "
-            "GlobalSteps: {}, LocalSpd: {:.0f} STEPS/s GlobalSpd: "
+            "TRAIN: {}(GlobalSteps) ,mean: {}, min: {}, max: {}, "
+            " LocalSpd: {:.0f} STEPS/s GlobalSpd: "
             "{} STEPS/s, {:.2f}M STEPS/hour, total elapsed time: {}".format(
+                global_steps,
                 green("{:0.3f}±{:0.2f}".format(mean_score, score_std)),
                 red("{:0.3f}".format(min_score)),
                 blue("{:0.3f}".format(max_score)),
-                global_steps,
                 local_steps_per_sec,
                 blue("{:.0f}".format(
                     global_steps_per_sec)),
