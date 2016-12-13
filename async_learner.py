@@ -102,7 +102,7 @@ class A3CLearner(Thread):
         advantages = []
         Rs = []
 
-        # TODO use default session
+        # TODO check how default session works
         self._session.run(self.local_network.ops.sync)
 
         initial_network_state = None
@@ -262,6 +262,7 @@ class A3CLearner(Thread):
             threadsafe_print(red("Thread #{} aborting(ViZDoom killed).".format(self.thread_index)))
 
     def run_training(self, session, global_steps_counter):
+        self._session = session
         if self.thread_index == 0:
             # TODO make including sesion.graph optional
             logdir = self._settings["logdir"]
@@ -275,6 +276,15 @@ class A3CLearner(Thread):
                 self._test_writer = None
             # TODO create saver
             self._saver = None
-        self._session = session
         self._global_steps_counter = global_steps_counter
         self.start()
+
+
+class ADQNLearner(A3CLearner):
+    def __init__(self, global_target_network,
+                 **args):
+        super(ADQNLearner, self).__init__(**args)
+        self.global_target_network = global_target_network
+
+    def make_training_step(self):
+        raise NotImplementedError()
