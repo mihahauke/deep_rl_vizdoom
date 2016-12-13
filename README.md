@@ -11,3 +11,12 @@ To install pyton dependecies:
 ```
 sudo3 pip3 install numpy tqdm ruamel.yaml 
 ```
+
+## Implemented algorithms:
+- DQN [Human-Level Control through Deep Reinforcement Learning](http://home.uchicago.edu/~arij/journalclub/papers/2015_Mnih_et_al.pdf)  
+- Double Dueling DQN [Dueling Network Architectures for Deep Reinforcement Learning](http://arxiv.org/abs/1511.06581)  
+- A3C [Asynchronous Methods for Deep Reinforcement Learning](https://arxiv.org/pdf/1602.01783v2.pdf)
+
+# TODO:
+- N-step asynchronous DQN [Asynchronous Methods for Deep Reinforcement Learning](https://arxiv.org/pdf/1602.01783v2.pdf)
+- [Prioritized Experience Replay](https://arxiv.org/pdf/1511.05952v4.pdf)
