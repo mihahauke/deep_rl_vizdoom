@@ -16,20 +16,20 @@ models_path: models
 logdir: logs
 run_tag: null
 use_freedoom: false
-network_type: lstm_ac
+network_type: ADQNNet
 activation_fn: tf.nn.relu
 
 # General training options
 epochs: Inf
 local_steps_per_epoch: 1000
 test_episodes_per_epoch: 100
-run_tests: false
+run_tests: true
 max_remembered_steps: 5
 constant_learning_rate: true
 initial_learning_rate: 0.00025
 final_learning_rate: 0.0000001
 learning_rate_decay_steps: 10e07
-
+frozen_global_steps: 40000
 # RMSProp
 rmsprop:
   decay: 0.99

@@ -5,17 +5,18 @@ import tensorflow as tf
 from time import strftime
 
 from vizdoom_wrapper import VizdoomWrapper
-from networks import create_network
 from tqdm import trange
 from random import random, randint
 from replay_memory import ReplayMemory
 from time import time
 from util.coloring import red, green, blue
 from util import sec_to_str
+import networks
 
 
 class DQN(object):
     def __init__(self,
+                 network_type="DQNNet",
                  write_summaries=True,
                  epochs=100,
                  train_steps_per_epoch=1000000,
@@ -39,7 +40,7 @@ class DQN(object):
         self.write_summaries = write_summaries
         self._settings = settings
         date_string = strftime("%d.%m.%y-%H:%M")
-        self._run_string = "{}/{}/{}".format(settings["base_tag"], settings["network_type"], date_string)
+        self._run_string = "{}/{}/{}".format(settings["base_tag"], network_type, date_string)
         self.train_steps_per_epoch = train_steps_per_epoch
         self._run_tests = test_episodes_per_epoch > 0 and run_tests
         self.test_episodes_per_epoch = test_episodes_per_epoch
@@ -52,8 +53,9 @@ class DQN(object):
         self.use_misc = self.doom_wrapper.use_misc
         self.actions_num = self.doom_wrapper.actions_num
         self.replay_memory = ReplayMemory(img_shape, misc_len, batch_size=batchsize, capacity=memory_capacity)
-        self.network = create_network(actions_num=self.actions_num, img_shape=img_shape, misc_len=misc_len,
-                                          **settings)
+        self.network = eval("networks." + network_type)(actions_num=self.actions_num, img_shape=img_shape,
+                                                        misc_len=misc_len,
+                                                        **settings)
 
         self.batchsize = batchsize
         self.frozen_steps = frozen_steps
@@ -73,6 +75,7 @@ class DQN(object):
         # TODO epoch as tf variable?
         self._epoch = 1
 
+        # Epsilon
         self.epsilon_decay_rate = (initial_epsilon - final_epsilon) / epsilon_decay_steps
         self.epsilon_decay_start_step = epsilon_decay_start_step
         self.initial_epsilon = initial_epsilon

@@ -5,13 +5,12 @@ import os
 from util.parsers import parse_train_async_args
 from util.coloring import green
 from async_learner import A3CLearner, ADQNLearner
-
+import networks
 
 def train_async(q_learning, settings):
     import tensorflow as tf
 
     from vizdoom_wrapper import VizdoomWrapper
-    from networks import create_network
     from util import ThreadsafeCounter
     from util.optimizers import ClippingRMSPropOptimizer
 
@@ -32,9 +31,13 @@ def train_async(q_learning, settings):
     optimizer = ClippingRMSPropOptimizer(learning_rate=global_learning_rate, **settings["rmsprop"])
 
     actor_learners = []
-    global_network = create_network(actions_num=actions_num, misc_len=misc_len, img_shape=img_shape, **settings)
+    network_class = eval("networks." + settings["network_type"])
+    global_network = network_class(actions_num=actions_num, misc_len=misc_len, img_shape=img_shape,
+                                                    **settings)
     if q_learning:
-        global_target_network = None
+        global_target_network = network_class(thread="global_target", actions_num=actions_num,
+                                                               misc_len=misc_len,
+                                                               img_shape=img_shape, **settings)
         for i in range(settings["threads_num"]):
             actor_learner = ADQNLearner(thread_index=i, global_network=global_network,
                                         global_target_network=global_target_network, optimizer=optimizer,
@@ -55,6 +58,9 @@ def train_async(q_learning, settings):
     print("Initialization finished.")
     global_steps_counter = ThreadsafeCounter()
 
+    if q_learning:
+        # TODO copy global network params to the target network (unfreeze)
+        pass
     # TODO print settings
     print(green("Launching training."))
     for l in actor_learners:

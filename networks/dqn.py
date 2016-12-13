@@ -8,9 +8,7 @@ from util.tfutil import gather_2d
 from .common import default_conv_layers
 
 
-class BaseDQNNet(object):
-    shortname = "dqn"
-
+class DQNNet(object):
     def __init__(self,
                  actions_num,
                  img_shape,
@@ -131,17 +129,15 @@ class BaseDQNNet(object):
         session.run(self.ops.unfreeze)
 
     def _get_name_scope(self):
-        return BaseDQNNet.shortname
+        return "dqn"
 
 
-class DuelingDQNNet(BaseDQNNet):
-    shortname = "dueling_dqn"
-
+class DuelingDQNNet(DQNNet):
     def __init__(self, *args, **kwargs):
         super(DuelingDQNNet, self).__init__(*args, **kwargs)
 
     def _get_name_scope(self):
-        return DuelingDQNNet.shortname
+        return "dueling_dqn"
 
     def create_architecture(self, img_input, misc_input, name_scope, reuse=False, **specs):
         with arg_scope([layers.conv2d, layers.fully_connected], reuse=reuse), \

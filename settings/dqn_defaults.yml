@@ -6,10 +6,9 @@ logdir: logs
 run_tag: null
 
 # Network
-network_type: dqn
+network_type: DuelingDQNNet
 activation_fn: tf.nn.relu
 double: true
-duelling: true
 prioritized_memory: true
 batchsize: 64
 memory_capacity: 10000

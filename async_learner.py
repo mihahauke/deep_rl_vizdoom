@@ -1,16 +1,18 @@
 # -*- coding: utf-8 -*-
-from vizdoom import SignalException, ViZDoomUnexpectedExitException
-from util import sec_to_str, threadsafe_print
+
 import numpy as np
 import random
 import time
-from vizdoom_wrapper import VizdoomWrapper
-from networks import create_network
 from tqdm import trange
 from threading import Thread
 from util.coloring import red, green, blue
 from time import strftime
 import tensorflow as tf
+import sys
+from vizdoom import SignalException, ViZDoomUnexpectedExitException
+from util import sec_to_str, threadsafe_print
+from vizdoom_wrapper import VizdoomWrapper
+from networks import *
 
 
 class A3CLearner(Thread):
@@ -18,6 +20,7 @@ class A3CLearner(Thread):
                  thread_index,
                  global_network,
                  optimizer,
+                 network_type,
                  write_summaries=True,
                  **settings):
         super(A3CLearner, self).__init__()
@@ -27,7 +30,8 @@ class A3CLearner(Thread):
         self.write_summaries = write_summaries
         self._settings = settings
         date_string = strftime("%d.%m.%y-%H:%M")
-        self._run_string = "{}/{}_{}/{}".format(settings["base_tag"], settings["network_type"], settings["threads_num"],
+        self._run_string = "{}/{}_{}/{}".format(settings["base_tag"], network_type
+                                                , settings["threads_num"],
                                                 date_string)
 
         self.steps_per_epoch = settings["local_steps_per_epoch"]
@@ -44,8 +48,8 @@ class A3CLearner(Thread):
 
         self.actions_num = self.doom_wrapper.actions_num
 
-        self.local_network = create_network(actions_num=self.actions_num, img_shape=img_shape, misc_len=misc_len,
-                                            thread=thread_index, **settings)
+        self.local_network = eval(network_type)(actions_num=self.actions_num, img_shape=img_shape, misc_len=misc_len,
+                                                thread=thread_index, **settings)
 
         # TODO check gate_gradients != Optimizer.GATE_OP
         grads_and_vars = optimizer.compute_gradients(self.local_network.ops.loss,
@@ -55,7 +59,7 @@ class A3CLearner(Thread):
 
         self.train_op = optimizer.apply_gradients(grads_and_global_vars, global_step=tf.train.get_global_step())
         self.local_network.prepare_sync_op(global_network)
-
+        self.global_network = global_network
         self.local_steps = 0
         # TODO epoch as tf variable?
         self._epoch = 1
@@ -106,7 +110,6 @@ class A3CLearner(Thread):
         self._session.run(self.local_network.ops.sync)
 
         initial_network_state = None
-        # TODO add remember state or sumtin
         if self.local_network.has_state():
             initial_network_state = self.local_network.get_current_network_state()
 
@@ -143,9 +146,7 @@ class A3CLearner(Thread):
             R = ri + self.gamma * R
             advantages.insert(0, R - Vi)
             Rs.insert(0, R)
-        np.set_printoptions(precision=3)
 
-        # TODO delegate this to the network as train_batch(session, ...)
         train_op_feed_dict = {
             self.local_network.vars.state_img: states_img,
             self.local_network.vars.a: actions,
@@ -166,14 +167,14 @@ class A3CLearner(Thread):
     def test(self, sess):
         test_start_time = time.time()
         test_rewards = []
-        for _ in trange(self.test_episodes_per_epoch, leave=False):
+        for _ in trange(self.test_episodes_per_epoch, leave=False, file=sys.stdout):
             self.doom_wrapper.reset()
             if self.local_network.has_state():
                 self.local_network.reset_state()
             while not self.doom_wrapper.is_terminal():
                 current_state = self.doom_wrapper.get_current_state()
-                policy = self.local_network.get_policy(sess, current_state)
-                action_index = self.choose_action_index(policy, deterministic=True)
+                q = self.local_network.get_q_values(sess, current_state).flatten()
+                action_index = q.argmax()
                 self.doom_wrapper.make_action(action_index)
 
             total_reward = self.doom_wrapper.get_total_reward()
@@ -190,7 +191,7 @@ class A3CLearner(Thread):
         mean_score = np.mean(test_rewards)
         score_std = np.std(test_rewards)
         print(
-            "TEST: mean: {}, min: {}, max: {} ,test time: {}".format(
+            "TEST: mean: {}, min: {}, max: {}, test time: {}".format(
                 green("{:0.3f}±{:0.2f}".format(mean_score, score_std)),
                 red("{:0.3f}".format(min_score)),
                 blue("{:0.3f}".format(max_score)),
@@ -225,6 +226,7 @@ class A3CLearner(Thread):
             ))
 
     def run(self):
+        # TODO this method is ugly, make it nicer
         try:
             overall_start_time = time.time()
             last_log_time = overall_start_time
@@ -264,7 +266,6 @@ class A3CLearner(Thread):
     def run_training(self, session, global_steps_counter):
         self._session = session
         if self.thread_index == 0:
-            # TODO make including sesion.graph optional
             logdir = self._settings["logdir"]
             if self._settings["run_tag"] is not None:
                 logdir += "/" + str(self._settings["run_tag"])
@@ -281,10 +282,139 @@ class A3CLearner(Thread):
 
 
 class ADQNLearner(A3CLearner):
-    def __init__(self, global_target_network,
+    def __init__(self,
+                 global_target_network,
+                 frozen_global_steps=40000,
+                 initial_epsilon=1.0,
+                 final_epsilon=0.1,
+                 epsilon_decay_steps=10e06,
+                 epsilon_decay_start_step=0,
                  **args):
         super(ADQNLearner, self).__init__(**args)
         self.global_target_network = global_target_network
+        if self.thread_index == 0:
+            self.frozen_global_steps = frozen_global_steps
+            self.global_network.prepare_unfreeze_op(global_target_network)
+        else:
+            self.frozen_global_steps = None
+
+        # Epsilon
+        self.epsilon_decay_rate = (initial_epsilon - final_epsilon) / epsilon_decay_steps
+        self.epsilon_decay_start_step = epsilon_decay_start_step
+        self.initial_epsilon = initial_epsilon
+        self.final_epsilon = final_epsilon
+
+    def get_current_epsilon(self):
+        eps = self.initial_epsilon - (self.local_steps - self.epsilon_decay_start_step) * self.epsilon_decay_rate
+        return np.clip(eps, self.final_epsilon, 1.0)
 
     def make_training_step(self):
-        raise NotImplementedError()
+        states_img = []
+        states_misc = []
+        actions = []
+        rewards_reversed = []
+        target_qs = []
+
+        self._session.run(self.local_network.ops.sync)
+
+        initial_network_state = None
+        if self.local_network.has_state():
+            initial_network_state = self.local_network.get_current_network_state()
+
+        terminal = None
+        steps_performed = 0
+        for _ in range(self.max_remembered_steps):
+            steps_performed += 1
+            current_img, current_misc = self.doom_wrapper.get_current_state()
+
+            if random.random() <= self.get_current_epsilon():
+                q_values = self.local_network.get_q_values(self._session, [current_img, current_misc]).flatten()
+                action_index = q_values.argmax()
+            else:
+                action_index = random.randint(0, self.actions_num - 1)
+
+            states_img.append(current_img)
+            states_misc.append(current_misc)
+            actions.append(action_index)
+            reward = self.doom_wrapper.make_action(action_index)
+            terminal = self.doom_wrapper.is_terminal()
+            rewards_reversed.insert(0, reward)
+            self.local_steps += 1
+            if terminal:
+                if self.thread_index == 0:
+                    self.train_scores.append(self.doom_wrapper.get_total_reward())
+                self.doom_wrapper.reset()
+                if self.local_network.has_state():
+                    self.local_network.reset_state()
+                break
+
+        if terminal:
+            target_q = 0.0
+        else:
+            target_q = self.global_target_network.get_q_values(self._session,
+                                                               self.doom_wrapper.get_current_state()).max()
+
+        for ri in rewards_reversed:
+            target_q = ri + self.gamma * target_q
+            target_qs.insert(0, target_q)
+
+        # TODO delegate this to the network as train_batch(session, ...)
+        train_op_feed_dict = {
+            self.local_network.vars.state_img: states_img,
+            self.local_network.vars.a: actions,
+            self.local_network.vars.target_q: target_qs
+        }
+        if self.use_misc:
+            train_op_feed_dict[self.local_network.vars.state_misc] = states_misc
+
+        if self.local_network.has_state():
+            train_op_feed_dict[self.local_network.vars.initial_network_state] = initial_network_state
+            train_op_feed_dict[self.local_network.vars.sequence_length] = [len(actions)]
+
+        self._session.run(self.train_op, feed_dict=train_op_feed_dict)
+
+        return steps_performed
+
+    def run(self):
+        # TODO this method is ugly, make it nicer
+        # Basically code copied from base class with unfreezing
+        try:
+            overall_start_time = time.time()
+            last_log_time = overall_start_time
+            local_steps_for_log = 0
+            while self._epoch <= self._epochs:
+                steps = self.make_training_step()
+                local_steps_for_log += steps
+                global_steps = self._global_steps_counter.inc(steps)
+
+                # Unfreezing:
+                # TODO this check is dangerous
+                if self.thread_index == 0:
+                    if self.steps_per_epoch * self._epoch <= self.frozen_global_steps:
+                        self._session.run(self.global_network.ops.unfreeze)
+                # Logs & tests
+                if self.steps_per_epoch * self._epoch <= self.local_steps:
+                    self._epoch += 1
+
+                    if self.thread_index == 0:
+                        self._print_log(self.train_scores, overall_start_time, last_log_time, local_steps_for_log)
+                        mean_train_score = np.mean(self.train_scores)
+                        self.train_scores = []
+
+                        test_score = None
+                        if self._run_tests:
+                            test_score = self.test(self._session)
+
+                        if self.write_summaries:
+                            train_summary = self._session.run(self._summaries, {self.score: mean_train_score})
+                            self._train_writer.add_summary(train_summary, global_steps)
+                            if self._run_tests:
+                                test_summary = self._session.run(self._summaries, {self.score: test_score})
+                                self._test_writer.add_summary(test_summary, global_steps)
+
+                        last_log_time = time.time()
+                        local_steps_for_log = 0
+                        print()
+
+        except (SignalException, ViZDoomUnexpectedExitException):
+            threadsafe_print(red("Thread #{} aborting(ViZDoom killed).".format(self.thread_index)))

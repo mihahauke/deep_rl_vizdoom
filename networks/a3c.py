@@ -53,12 +53,11 @@ class _BaseACNet(object):
     def prepare_sync_op(self, global_network):
         global_params = global_network.get_params()
         local_params = self.get_params()
-        sync_ops = [tf.assign(dst_var, src_var) for src_var, dst_var in zip(global_params, local_params)]
+        sync_ops = [tf.assign(dst_var, src_var) for dst_var, src_var, in zip(local_params, global_params)]
 
         self.ops.sync = tf.group(*sync_ops, name="SyncWithGlobal")
 
     def _prepare_loss_op(self):
-        # TODO use gather2d instead of one hot action
         self.vars.a = tf.placeholder(tf.float32, [None], name="action")
         self.vars.advantage = tf.placeholder(tf.float32, [None], name="advantage")
         self.vars.R = tf.placeholder(tf.float32, [None], name="R")
@@ -109,14 +108,12 @@ class _BaseACNet(object):
 
 
 class FFACNet(_BaseACNet):
-    shortname = "ff_ac"
-
     def __init__(self,
                  **kwargs):
         super(FFACNet, self).__init__(**kwargs)
 
     def _get_name_scope(self):
-        return "a3c_ff_net"
+        return "ff_ac"
 
     def create_architecture(self):
         conv_layers = default_conv_layers(self.vars.state_img, self._name_scope)
@@ -195,7 +192,6 @@ class _BaseRcurrentACNet(_BaseACNet):
         return pi[0], v[0]
 
     def get_policy(self, sess, state, update_state=True):
-        old_state = self.network_state.c.copy(), self.network_state.h.copy()
         if update_state:
             pi, self.network_state = sess.run([self.ops.pi, self.ops.network_state],
                                               feed_dict=self.get_standard_feed_dict(state))
@@ -219,31 +215,27 @@ class _BaseRcurrentACNet(_BaseACNet):
         return True
 
 
-class BasicLstmACACNet(_BaseRcurrentACNet):
-    shortname = "basic_lstm_ac"
-
+class BasicLstmACNet(_BaseRcurrentACNet):
     def __init__(self,
                  **settings
                  ):
-        super(BasicLstmACACNet, self).__init__(**settings)
+        super(BasicLstmACNet, self).__init__(**settings)
 
     def _get_name_scope(self):
-        return BasicLstmACACNet.shortname
+        return "basic_lstm_ac"
 
     def _get_ru_class(self):
         return tf.nn.rnn_cell.BasicLSTMCell
 
 
-class LstmACACNet(_BaseRcurrentACNet):
-    shortname = "lstm_ac"
-
+class LstmACNet(_BaseRcurrentACNet):
     def __init__(self,
                  **settings
                  ):
-        super(LstmACACNet, self).__init__(**settings)
+        super(LstmACNet, self).__init__(**settings)
 
     def _get_name_scope(self):
-        return LstmACACNet.shortname
+        return "lstm_ac"
 
     def _get_ru_class(self):
         return tf.nn.rnn_cell.LSTMCell

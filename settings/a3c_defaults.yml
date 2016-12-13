@@ -16,7 +16,7 @@ models_path: models
 logdir: logs
 run_tag: null
 use_freedoom: false
-network_type: lstm_ac
+network_type: LstmACNet
 activation_fn: tf.nn.relu
 
 # General training options
