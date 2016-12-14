@@ -7,6 +7,7 @@ from util.coloring import green
 from async_learner import A3CLearner, ADQNLearner
 import networks
 
+
 def train_async(q_learning, settings):
     import tensorflow as tf
 
@@ -30,24 +31,27 @@ def train_async(q_learning, settings):
         global_step=global_train_step)
     optimizer = ClippingRMSPropOptimizer(learning_rate=global_learning_rate, **settings["rmsprop"])
 
-    actor_learners = []
+    learners = []
     network_class = eval("networks." + settings["network_type"])
     global_network = network_class(actions_num=actions_num, misc_len=misc_len, img_shape=img_shape,
-                                                    **settings)
+                                   **settings)
     if q_learning:
         global_target_network = network_class(thread="global_target", actions_num=actions_num,
-                                                               misc_len=misc_len,
-                                                               img_shape=img_shape, **settings)
+                                              misc_len=misc_len,
+                                              img_shape=img_shape, **settings)
+        global_network.prepare_unfreeze_op(global_target_network)
+        unfreeze_thread = min(1, settings["threads_num"] - 1)
         for i in range(settings["threads_num"]):
-            actor_learner = ADQNLearner(thread_index=i, global_network=global_network,
-                                        global_target_network=global_target_network, optimizer=optimizer,
-                                        **settings)
-            actor_learners.append(actor_learner)
+            learner = ADQNLearner(thread_index=i, global_network=global_network,
+                                  unfreeze_thread=i == unfreeze_thread,
+                                  global_target_network=global_target_network, optimizer=optimizer,
+                                  **settings)
+            learners.append(learner)
     else:
         for i in range(settings["threads_num"]):
-            actor_learner = A3CLearner(thread_index=i, global_network=global_network, optimizer=optimizer,
-                                       **settings)
-            actor_learners.append(actor_learner)
+            learner = A3CLearner(thread_index=i, global_network=global_network, optimizer=optimizer,
+                                 **settings)
+            learners.append(learner)
 
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -59,13 +63,12 @@ def train_async(q_learning, settings):
     global_steps_counter = ThreadsafeCounter()
 
     if q_learning:
-        # TODO copy global network params to the target network (unfreeze)
-        pass
+        session.run(global_network.ops.unfreeze)
     # TODO print settings
     print(green("Launching training."))
-    for l in actor_learners:
+    for l in learners:
         l.run_training(session, global_steps_counter=global_steps_counter)
-    for l in actor_learners:
+    for l in learners:
         l.join()
 
 

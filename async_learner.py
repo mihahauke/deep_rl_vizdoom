@@ -34,7 +34,7 @@ class A3CLearner(Thread):
                                                 , settings["threads_num"],
                                                 date_string)
 
-        self.steps_per_epoch = settings["local_steps_per_epoch"]
+        self.local_steps_per_epoch = settings["local_steps_per_epoch"]
         self._run_tests = settings["test_episodes_per_epoch"] > 0 and settings["run_tests"]
         self.test_episodes_per_epoch = settings["test_episodes_per_epoch"]
         self._epochs = np.float32(settings["epochs"])
@@ -237,7 +237,7 @@ class A3CLearner(Thread):
                 global_steps = self._global_steps_counter.inc(steps)
 
                 # Logs & tests
-                if self.steps_per_epoch * self._epoch <= self.local_steps:
+                if self.local_steps_per_epoch * self._epoch <= self.local_steps:
                     self._epoch += 1
 
                     if self.thread_index == 0:
@@ -284,6 +284,7 @@ class A3CLearner(Thread):
 class ADQNLearner(A3CLearner):
     def __init__(self,
                  global_target_network,
+                 unfreeze_thread=False,
                  frozen_global_steps=40000,
                  initial_epsilon=1.0,
                  final_epsilon=0.1,
@@ -292,13 +293,14 @@ class ADQNLearner(A3CLearner):
                  **args):
         super(ADQNLearner, self).__init__(**args)
         self.global_target_network = global_target_network
-        if self.thread_index == 0:
+        self.unfreeze_thread = unfreeze_thread
+        if unfreeze_thread:
             self.frozen_global_steps = frozen_global_steps
-            self.global_network.prepare_unfreeze_op(global_target_network)
         else:
             self.frozen_global_steps = None
 
         # Epsilon
+        # TODO randomize epsilon somehow
         self.epsilon_decay_rate = (initial_epsilon - final_epsilon) / epsilon_decay_steps
         self.epsilon_decay_start_step = epsilon_decay_start_step
         self.initial_epsilon = initial_epsilon
@@ -353,7 +355,6 @@ class ADQNLearner(A3CLearner):
         else:
             target_q = self.global_target_network.get_q_values(self._session,
                                                                self.doom_wrapper.get_current_state()).max()
-
         for ri in rewards_reversed:
             target_q = ri + self.gamma * target_q
             target_qs.insert(0, target_q)
@@ -382,18 +383,20 @@ class ADQNLearner(A3CLearner):
             overall_start_time = time.time()
             last_log_time = overall_start_time
             local_steps_for_log = 0
+            next_target_update = self.frozen_global_steps
             while self._epoch <= self._epochs:
                 steps = self.make_training_step()
                 local_steps_for_log += steps
                 global_steps = self._global_steps_counter.inc(steps)
 
-                # Unfreezing:
-                # TODO this check is dangerous
-                if self.thread_index == 0:
-                    if self.steps_per_epoch * self._epoch <= self.frozen_global_steps:
+                # Updating target network:
+                if self.unfreeze_thread:
+                    # TODO this check is dangerous
+                    if global_steps >= next_target_update:
+                        next_target_update += self.frozen_global_steps
                         self._session.run(self.global_network.ops.unfreeze)
                 # Logs & tests
-                if self.steps_per_epoch * self._epoch <= self.local_steps:
+                if self.local_steps_per_epoch * self._epoch <= self.local_steps:
                     self._epoch += 1
 
                     if self.thread_index == 0:

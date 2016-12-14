@@ -21,7 +21,7 @@ activation_fn: tf.nn.relu
 
 # General training options
 epochs: Inf
-local_steps_per_epoch: 1000
+local_steps_per_epoch: 5000
 test_episodes_per_epoch: 100
 run_tests: true
 max_remembered_steps: 5

@@ -16,7 +16,6 @@ class ADQNNet(object):
                  actions_num,
                  img_shape,
                  misc_len=0,
-                 entropy_beta=0.01,
                  thread="global",
                  activation_fn="tf.nn.relu",
                  **ignored):
@@ -31,7 +30,6 @@ class ADQNNet(object):
         self._name_scope = self._get_name_scope() + "_" + str(thread)
 
         self.params = None
-        self._entropy_beta = entropy_beta
 
         with arg_scope([layers.conv2d], data_format="NCHW"), \
              arg_scope([layers.fully_connected, layers.conv2d], activation_fn=self.activation_fn):
@@ -43,16 +41,14 @@ class ADQNNet(object):
     def prepare_sync_op(self, global_network):
         global_params = global_network.get_params()
         local_params = self.get_params()
-        sync_ops = [tf.assign(dst_var, src_var) for dst_var, src_var, in zip(local_params, global_params)]
-
+        sync_ops = [dst_var.assign(src_var) for dst_var, src_var, in zip(local_params, global_params)]
         self.ops.sync = tf.group(*sync_ops, name="SyncWithGlobal")
 
     def prepare_unfreeze_op(self, target_network):
         target_params = target_network.get_params()
         global_params = self.get_params()
-        sync_ops = [tf.assign(dst_var, src_var) for dst_var, src_var, in zip(target_params, global_params)]
-
-        self.ops.unfreeze = tf.group(*sync_ops, name="SyncWithGlobal")
+        unfreeze_ops = [dst_var.assign(src_var) for dst_var, src_var, in zip(target_params, global_params)]
+        self.ops.unfreeze = tf.group(*unfreeze_ops, name="UpdateTargetNetwork")
 
     def _prepare_loss_op(self):
         self.vars.a = tf.placeholder(tf.float32, [None], name="action")

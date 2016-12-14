@@ -53,7 +53,7 @@ class _BaseACNet(object):
     def prepare_sync_op(self, global_network):
         global_params = global_network.get_params()
         local_params = self.get_params()
-        sync_ops = [tf.assign(dst_var, src_var) for dst_var, src_var, in zip(local_params, global_params)]
+        sync_ops = [dst_var.assign(src_var) for dst_var, src_var, in zip(local_params, global_params)]
 
         self.ops.sync = tf.group(*sync_ops, name="SyncWithGlobal")
 
