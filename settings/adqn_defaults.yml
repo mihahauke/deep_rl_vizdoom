@@ -2,6 +2,7 @@ threads_num: 16
 
 # Vizdoom wrapper options:
 config_file: basic.cfg
+base_tag: basic
 resolution: [ 80, 60 ]
 frame_skip: 4
 stack_n_frames: 4
@@ -21,7 +22,7 @@ activation_fn: tf.nn.relu
 
 # General training options
 epochs: Inf
-local_steps_per_epoch: 5000
+local_steps_per_epoch: 50000
 test_episodes_per_epoch: 100
 run_tests: true
 max_remembered_steps: 5
@@ -34,7 +35,7 @@ frozen_global_steps: 40000
 rmsprop:
   decay: 0.99
   momentum: 0.0
-  clip_norm: 40.0
+  clip_norm: 0.0
 
 # Agent params
 gamma: 0.99

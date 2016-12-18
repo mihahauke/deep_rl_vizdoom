@@ -89,9 +89,4 @@ if __name__ == "__main__":
         override_settings = yaml.safe_load(open(settings_fpath))
         settings.update(override_settings)
 
-    if not os.path.isdir(settings["models_path"]):
-        os.makedirs(settings["models_path"])
-    if not os.path.isdir(settings["logdir"]):
-        os.makedirs(settings["logdir"])
-
     train_async(args.q, settings)

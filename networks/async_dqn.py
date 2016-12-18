@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 
 import tensorflow as tf
+import numpy as np
 
+from tensorflow.python.ops.rnn_cell import LSTMStateTuple
 from tensorflow.contrib.framework import arg_scope
 from tensorflow.contrib import layers
 
@@ -91,5 +93,80 @@ class ADQNNet(object):
     def has_state(self):
         return False
 
+    def get_current_network_state(self):
+        raise NotImplementedError()
+
     def _get_name_scope(self):
         return "async_dqn"
+
+
+class ADQNLstmNet(ADQNNet):
+    def __init__(self, recurrent_units_num=256, **kwargs):
+        self.network_state = None
+        self._recurrent_units_num = recurrent_units_num
+        super(ADQNLstmNet, self).__init__(**kwargs)
+
+        raise NotImplementedError()
+
+    def has_state(self):
+        return True
+
+    def get_current_network_state(self):
+        return self.network_state
+
+    def get_standard_feed_dict(self, state):
+        feed_dict = super(ADQNLstmNet, self).get_standard_feed_dict(state)
+        feed_dict[self.vars.initial_network_state] = self.network_state,
+        feed_dict[self.vars.sequence_length] = [1]
+        return feed_dict
+
+    def get_q_values(self, sess, state, update_state=True, initial_network_state=None):
+        feed_dict = self.get_standard_feed_dict(state)
+        if initial_network_state is not None:
+            feed_dict[self.vars.initial_network_state] = initial_network_state
+
+        if update_state:
+            q, self.network_state = sess.run([self.ops.pi, self.ops.network_state],
+                                             feed_dict=feed_dict)
+        else:
+            q = sess.run(self.ops.pi, feed_dict=feed_dict)
+
+        return q
+
+    def reset_state(self):
+        state_c = np.zeros([1, self.recurrent_cells.state_size.c], dtype=np.float32)
+        state_h = np.zeros([1, self.recurrent_cells.state_size.h], dtype=np.float32)
+        self.network_state = LSTMStateTuple(state_c, state_h)
+
+    def _get_ru_class(self):
+        return tf.nn.rnn_cell.LSTMCell
+
+    def create_architecture(self):
+        conv_layers = default_conv_layers(self.vars.state_img, self._name_scope)
+
+        if self.use_misc:
+            fc_input = tf.concat(concat_dim=1, values=[conv_layers, self.vars.state_misc])
+        else:
+            fc_input = conv_layers
+
+        fc1 = layers.fully_connected(fc_input, num_outputs=512, scope=self._name_scope + "/fc1")
+        fc1_reshaped = tf.reshape(fc1, [1, -1, self._recurrent_units_num])
+
+        self.recurrent_cells = self._get_ru_class()(self._recurrent_units_num)
+        state_c = tf.placeholder(tf.float32, [1, self.recurrent_cells.state_size.c], name="initial_lstm_state_c")
+        state_h = tf.placeholder(tf.float32, [1, self.recurrent_cells.state_size.h], name="initial_lstm_state_h")
+        self.vars.initial_network_state = LSTMStateTuple(state_c, state_h)
+        rnn_outputs, self.ops.network_state = tf.nn.dynamic_rnn(self.recurrent_cells,
+                                                                fc1_reshaped,
+                                                                initial_state=self.vars.initial_network_state,
+                                                                sequence_length=self.vars.sequence_length,
+                                                                time_major=False,
+                                                                scope=self._name_scope)
+        reshaped_rnn_outputs = tf.reshape(rnn_outputs, [-1, self._recurrent_units_num])
+
+        q = layers.linear(reshaped_rnn_outputs, num_outputs=self.actions_num, scope=self._name_scope + "/q")
+        self.reset_state()
+        return q
+
+    def _get_name_scope(self):
+        return "async_dqn_lstm"

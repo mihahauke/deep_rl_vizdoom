@@ -103,6 +103,9 @@ class _BaseACNet(object):
     def has_state(self):
         return False
 
+    def get_current_network_state(self):
+        raise NotImplementedError()
+
     def _get_name_scope(self):
         raise NotImplementedError()
 

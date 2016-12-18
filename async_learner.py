@@ -9,6 +9,7 @@ from util.coloring import red, green, blue
 from time import strftime
 import tensorflow as tf
 import sys
+import os
 from vizdoom import SignalException, ViZDoomUnexpectedExitException
 from util import sec_to_str, threadsafe_print
 from vizdoom_wrapper import VizdoomWrapper
@@ -29,10 +30,20 @@ class A3CLearner(Thread):
         self.thread_index = thread_index
         self.write_summaries = write_summaries
         self._settings = settings
-        date_string = strftime("%d.%m.%y-%H:%M")
-        self._run_string = "{}/{}_{}/{}".format(settings["base_tag"], network_type
-                                                , settings["threads_num"],
-                                                date_string)
+        if self.write_summaries:
+            date_string = strftime("%d.%m.%y-%H:%M")
+            self._run_string = "{}/{}_{}th/{}".format(settings["base_tag"],
+                                                      network_type,
+                                                      settings["threads_num"],
+                                                      date_string)
+
+            if settings["logdir"] is not None:
+                if not os.path.isdir(settings["logdir"]):
+                    os.makedirs(settings["logdir"])
+
+        # if settings["models_path"] is not None:
+        #     if not os.path.isdir(settings["models_path"]):
+        #         os.makedirs(settings["models_path"])
 
         self.local_steps_per_epoch = settings["local_steps_per_epoch"]
         self._run_tests = settings["test_episodes_per_epoch"] > 0 and settings["run_tests"]
@@ -353,8 +364,16 @@ class ADQNLearner(A3CLearner):
         if terminal:
             target_q = 0.0
         else:
-            target_q = self.global_target_network.get_q_values(self._session,
-                                                               self.doom_wrapper.get_current_state()).max()
+            if self.global_network.has_state():
+                q2 = self.global_target_network.get_q_values(self._session,
+                                                             self.doom_wrapper.get_current_state(),
+                                                             False,
+                                                             self.local_network.get_current_network_state())
+                target_q = q2.max()
+            else:
+                target_q = self.global_target_network.get_q_values(self._session,
+                                                                   self.doom_wrapper.get_current_state()).max()
+
         for ri in rewards_reversed:
             target_q = ri + self.gamma * target_q
             target_qs.insert(0, target_q)
