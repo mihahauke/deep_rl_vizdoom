@@ -66,6 +66,7 @@ class A3CLearner(Thread):
         grads_and_vars = optimizer.compute_gradients(self.local_network.ops.loss,
                                                      var_list=self.local_network.get_params())
         grads, local_vars = zip(*grads_and_vars)
+
         grads_and_global_vars = zip(grads, global_network.get_params())
 
         self.train_op = optimizer.apply_gradients(grads_and_global_vars, global_step=tf.train.get_global_step())
@@ -329,7 +330,6 @@ class ADQNLearner(A3CLearner):
         target_qs = []
 
         self._session.run(self.local_network.ops.sync)
-
         initial_network_state = None
         if self.local_network.has_state():
             initial_network_state = self.local_network.get_current_network_state()
@@ -369,10 +369,10 @@ class ADQNLearner(A3CLearner):
                                                              self.doom_wrapper.get_current_state(),
                                                              False,
                                                              self.local_network.get_current_network_state())
-                target_q = q2.max()
             else:
-                target_q = self.global_target_network.get_q_values(self._session,
-                                                                   self.doom_wrapper.get_current_state()).max()
+                q2 = self.global_target_network.get_q_values(self._session,
+                                                             self.doom_wrapper.get_current_state())
+            target_q = q2.max()
 
         for ri in rewards_reversed:
             target_q = ri + self.gamma * target_q
@@ -392,7 +392,6 @@ class ADQNLearner(A3CLearner):
             train_op_feed_dict[self.local_network.vars.sequence_length] = [len(actions)]
 
         self._session.run(self.train_op, feed_dict=train_op_feed_dict)
-
         return steps_performed
 
     def run(self):

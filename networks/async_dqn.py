@@ -103,10 +103,9 @@ class ADQNNet(object):
 class ADQNLstmNet(ADQNNet):
     def __init__(self, recurrent_units_num=256, **kwargs):
         self.network_state = None
+        self.recurrent_cells = None
         self._recurrent_units_num = recurrent_units_num
         super(ADQNLstmNet, self).__init__(**kwargs)
-
-        raise NotImplementedError()
 
     def has_state(self):
         return True
@@ -126,10 +125,10 @@ class ADQNLstmNet(ADQNNet):
             feed_dict[self.vars.initial_network_state] = initial_network_state
 
         if update_state:
-            q, self.network_state = sess.run([self.ops.pi, self.ops.network_state],
+            q, self.network_state = sess.run([self.ops.q, self.ops.network_state],
                                              feed_dict=feed_dict)
         else:
-            q = sess.run(self.ops.pi, feed_dict=feed_dict)
+            q = sess.run(self.ops.q, feed_dict=feed_dict)
 
         return q
 
@@ -142,14 +141,15 @@ class ADQNLstmNet(ADQNNet):
         return tf.nn.rnn_cell.LSTMCell
 
     def create_architecture(self):
+        self.vars.sequence_length = tf.placeholder(tf.int64, [1], name="sequence_length")
         conv_layers = default_conv_layers(self.vars.state_img, self._name_scope)
 
         if self.use_misc:
             fc_input = tf.concat(concat_dim=1, values=[conv_layers, self.vars.state_misc])
         else:
             fc_input = conv_layers
-
-        fc1 = layers.fully_connected(fc_input, num_outputs=512, scope=self._name_scope + "/fc1")
+        # TODO add fc units num in settings
+        fc1 = layers.fully_connected(fc_input, num_outputs=self._recurrent_units_num, scope=self._name_scope + "/fc1")
         fc1_reshaped = tf.reshape(fc1, [1, -1, self._recurrent_units_num])
 
         self.recurrent_cells = self._get_ru_class()(self._recurrent_units_num)

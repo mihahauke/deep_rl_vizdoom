@@ -1,7 +1,6 @@
 threads_num: 16
 
 # Vizdoom wrapper options:
-config_file: basic.cfg
 resolution: [ 80, 60 ]
 frame_skip: 4
 stack_n_frames: 4
@@ -21,7 +20,7 @@ activation_fn: tf.nn.relu
 
 # General training options
 epochs: Inf
-local_steps_per_epoch: 1000
+local_steps_per_epoch: 50000
 test_episodes_per_epoch: 100
 run_tests: false
 

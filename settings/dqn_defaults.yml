@@ -1,6 +1,4 @@
 # Default scenario and paths
-config_file: basic.cfg
-base_tag: basic_dqn
 models_path: models
 logdir: logs
 run_tag: null
@@ -12,12 +10,12 @@ double: true
 prioritized_memory: true
 batchsize: 64
 memory_capacity: 10000
-frozen_steps: 5000
+frozen_steps: 40000
 update_pattern: [4, 4]
 
 # Training params
 epochs: Inf
-train_steps_per_epoch: 5000
+train_steps_per_epoch: 1000000
 test_episodes_per_epoch: 100
 rmsprop:
   epsilon: 1e-10

@@ -59,7 +59,7 @@ def train_async(q_learning, settings):
 
     print("Initializing variables...")
     session.run(tf.global_variables_initializer())
-    print("Initialization finished.")
+    print("Initialization finished.\n")
     global_steps_counter = ThreadsafeCounter()
 
     if q_learning:

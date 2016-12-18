@@ -1,8 +1,6 @@
 threads_num: 16
 
 # Vizdoom wrapper options:
-config_file: basic.cfg
-base_tag: basic
 resolution: [ 80, 60 ]
 frame_skip: 4
 stack_n_frames: 4
