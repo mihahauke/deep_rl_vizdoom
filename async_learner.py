@@ -179,14 +179,14 @@ class A3CLearner(Thread):
     def test(self, sess):
         test_start_time = time.time()
         test_rewards = []
-        for _ in trange(self.test_episodes_per_epoch, leave=False, file=sys.stdout):
+        for _ in trange(self.test_episodes_per_epoch, leave=False):
             self.doom_wrapper.reset()
             if self.local_network.has_state():
                 self.local_network.reset_state()
             while not self.doom_wrapper.is_terminal():
                 current_state = self.doom_wrapper.get_current_state()
-                q = self.local_network.get_q_values(sess, current_state).flatten()
-                action_index = q.argmax()
+                policy = self.local_network.get_policy(sess, current_state)
+                action_index = self.choose_action_index(policy, deterministic=True)
                 self.doom_wrapper.make_action(action_index)
 
             total_reward = self.doom_wrapper.get_total_reward()
@@ -203,7 +203,7 @@ class A3CLearner(Thread):
         mean_score = np.mean(test_rewards)
         score_std = np.std(test_rewards)
         print(
-            "TEST: mean: {}, min: {}, max: {}, test time: {}".format(
+            "TEST: mean: {}, min: {}, max: {} ,test time: {}".format(
                 green("{:0.3f}±{:0.2f}".format(mean_score, score_std)),
                 red("{:0.3f}".format(min_score)),
                 blue("{:0.3f}".format(max_score)),
@@ -341,10 +341,12 @@ class ADQNLearner(A3CLearner):
             current_img, current_misc = self.doom_wrapper.get_current_state()
 
             if random.random() <= self.get_current_epsilon():
+                action_index = random.randint(0, self.actions_num - 1)
+                if self.local_network.has_state():
+                    self.local_network.update_network_state(self._session, [current_img, current_misc])
+            else:
                 q_values = self.local_network.get_q_values(self._session, [current_img, current_misc]).flatten()
                 action_index = q_values.argmax()
-            else:
-                action_index = random.randint(0, self.actions_num - 1)
 
             states_img.append(current_img)
             states_misc.append(current_misc)
@@ -372,6 +374,7 @@ class ADQNLearner(A3CLearner):
             else:
                 q2 = self.global_target_network.get_q_values(self._session,
                                                              self.doom_wrapper.get_current_state())
+
             target_q = q2.max()
 
         for ri in rewards_reversed:
@@ -439,3 +442,38 @@ class ADQNLearner(A3CLearner):
 
         except (SignalException, ViZDoomUnexpectedExitException):
             threadsafe_print(red("Thread #{} aborting(ViZDoom killed).".format(self.thread_index)))
+
+    def test(self, sess):
+        # TODO maybe rmember state for training? SHould not matter so much bt still...
+        test_start_time = time.time()
+        test_rewards = []
+        for _ in trange(self.test_episodes_per_epoch, leave=False, file=sys.stdout):
+            self.doom_wrapper.reset()
+            if self.local_network.has_state():
+                self.local_network.reset_state()
+            while not self.doom_wrapper.is_terminal():
+                current_state = self.doom_wrapper.get_current_state()
+                q = self.local_network.get_q_values(sess, current_state).flatten()
+                action_index = q.argmax()
+                self.doom_wrapper.make_action(action_index)
+
+            total_reward = self.doom_wrapper.get_total_reward()
+            test_rewards.append(total_reward)
+
+        self.doom_wrapper.reset()
+        if self.local_network.has_state():
+            self.local_network.reset_state()
+
+        test_end_time = time.time()
+        test_duration = test_end_time - test_start_time
+        min_score = np.min(test_rewards)
+        max_score = np.max(test_rewards)
+        mean_score = np.mean(test_rewards)
+        score_std = np.std(test_rewards)
+        print(
+            "TEST: mean: {}, min: {}, max: {}, test time: {}".format(
+                green("{:0.3f}±{:0.2f}".format(mean_score, score_std)),
+                red("{:0.3f}".format(min_score)),
+                blue("{:0.3f}".format(max_score)),
+                sec_to_str(test_duration)))
+        return mean_score

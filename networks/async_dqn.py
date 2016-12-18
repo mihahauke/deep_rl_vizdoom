@@ -13,6 +13,7 @@ from util.tfutil import gather_2d
 from .common import default_conv_layers
 
 
+# TODO add dueling
 class ADQNNet(object):
     def __init__(self,
                  actions_num,
@@ -132,6 +133,9 @@ class ADQNLstmNet(ADQNNet):
 
         return q
 
+    def update_network_state(self, sess, state):
+        self.network_state = sess.run(self.ops.network_state, feed_dict=self.get_standard_feed_dict(state))
+
     def reset_state(self):
         state_c = np.zeros([1, self.recurrent_cells.state_size.c], dtype=np.float32)
         state_h = np.zeros([1, self.recurrent_cells.state_size.h], dtype=np.float32)
@@ -149,8 +153,9 @@ class ADQNLstmNet(ADQNNet):
         else:
             fc_input = conv_layers
         # TODO add fc units num in settings
-        fc1 = layers.fully_connected(fc_input, num_outputs=self._recurrent_units_num, scope=self._name_scope + "/fc1")
-        fc1_reshaped = tf.reshape(fc1, [1, -1, self._recurrent_units_num])
+        fc_units_num = 256
+        fc1 = layers.fully_connected(fc_input, fc_units_num, scope=self._name_scope + "/fc1")
+        fc1_reshaped = tf.reshape(fc1, [1, -1, fc_units_num])
 
         self.recurrent_cells = self._get_ru_class()(self._recurrent_units_num)
         state_c = tf.placeholder(tf.float32, [1, self.recurrent_cells.state_size.c], name="initial_lstm_state_c")
@@ -160,10 +165,8 @@ class ADQNLstmNet(ADQNNet):
                                                                 fc1_reshaped,
                                                                 initial_state=self.vars.initial_network_state,
                                                                 sequence_length=self.vars.sequence_length,
-                                                                time_major=False,
                                                                 scope=self._name_scope)
         reshaped_rnn_outputs = tf.reshape(rnn_outputs, [-1, self._recurrent_units_num])
-
         q = layers.linear(reshaped_rnn_outputs, num_outputs=self.actions_num, scope=self._name_scope + "/q")
         self.reset_state()
         return q
