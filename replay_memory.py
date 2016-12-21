@@ -5,25 +5,25 @@ import numpy as np
 
 
 class ReplayMemory:
-    def __init__(self, img_shape, misc_len=0, capacity=10000, batch_size=32):
-        self._s1_img = np.zeros([capacity] + list(img_shape), dtype=np.float32)
-        self._s2_img = np.zeros([capacity] + list(img_shape), dtype=np.float32)
+    def __init__(self, img_shape, misc_len=0, capacity=10000, batch_size=32,dtype=np.float32):
+        self._s1_img = np.zeros([capacity] + list(img_shape), dtype=dtype)
+        self._s2_img = np.zeros([capacity] + list(img_shape), dtype=dtype)
         self._a = np.zeros(capacity, dtype=np.int32)
-        self._r = np.zeros(capacity, dtype=np.float32)
+        self._r = np.zeros(capacity, dtype=dtype)
         self._terminal = np.zeros(capacity, dtype=np.bool_)
 
-        self._s1_img_buf = np.zeros([batch_size] + list(img_shape), dtype=np.float32)
-        self._s2_img_buf = np.zeros([batch_size] + list(img_shape), dtype=np.float32)
+        self._s1_img_buf = np.zeros([batch_size] + list(img_shape), dtype=dtype)
+        self._s2_img_buf = np.zeros([batch_size] + list(img_shape), dtype=dtype)
 
-        self._a_buf = np.zeros(batch_size, dtype=np.int32)
-        self._r_buf = np.zeros(batch_size, dtype=np.float32)
+        self._a_buf = np.zeros(batch_size, dtype=dtype)
+        self._r_buf = np.zeros(batch_size, dtype=dtype)
         self.termianl_buf = np.zeros(batch_size, dtype=np.bool_)
 
         if misc_len > 0:
-            self._s1_misc = np.zeros((capacity, misc_len), dtype=np.float32)
-            self._s2_misc = np.zeros((capacity, misc_len), dtype=np.float32)
-            self._s1_misc_buf = np.zeros((batch_size, misc_len), dtype=np.float32)
-            self._s2_misc_buf = np.zeros((batch_size, misc_len), dtype=np.float32)
+            self._s1_misc = np.zeros((capacity, misc_len), dtype=dtype)
+            self._s2_misc = np.zeros((capacity, misc_len), dtype=dtype)
+            self._s1_misc_buf = np.zeros((batch_size, misc_len), dtype=dtype)
+            self._s2_misc_buf = np.zeros((batch_size, misc_len), dtype=dtype)
             self._misc = True
         else:
             self._s1_misc = None
@@ -71,7 +71,7 @@ class ReplayMemory:
 
     def get_sample(self):
         if self._batch_size > self.size:
-            raise Exception("Transition bank doesn't contain " + str(self._batch_size) + " entries.")
+            raise Exception("Replay memory doesn't contain " + str(self._batch_size) + " entries.")
         indexes = random.sample(range(0, self.size), self._batch_size)
         self._s1_img_buf[:] = self._s1_img[indexes]
         self._s2_img_buf[:] = self._s2_img[indexes]
