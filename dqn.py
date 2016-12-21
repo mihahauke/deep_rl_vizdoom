@@ -113,7 +113,8 @@ class DQN(object):
         config.gpu_options.allow_growth = True
         session = tf.InteractiveSession(config=config)
         session.run(tf.global_variables_initializer())
-
+        print()
+        
         # Prefill replay memory:
         for _ in trange(self.replay_memory.capacity, leave=False, desc="Filling replay memory."):
             if self.doom_wrapper.is_terminal():
@@ -133,7 +134,7 @@ class DQN(object):
             test_scores = []
             train_start_time = time()
 
-            for _ in trange(self.train_steps_per_epoch, leave=False, desc="Training"):
+            for _ in trange(self.train_steps_per_epoch, leave=False, desc="Training, epoch {}".format(self._epoch)):
                 self.steps += 1
                 s1 = self.doom_wrapper.get_current_state()
 
@@ -163,7 +164,7 @@ class DQN(object):
             self.print_epoch_log("TRAIN", train_scores, self.train_steps_per_epoch, train_time)
             test_start_time = time()
             test_steps = 0
-            for _ in trange(self.test_episodes_per_epoch, leave=False, desc="Testing"):
+            for _ in trange(self.test_episodes_per_epoch, leave=False, desc="Testing, epoch {}".format(self._epoch)):
                 self.doom_wrapper.reset()
                 while not self.doom_wrapper.is_terminal():
                     test_steps += 1
