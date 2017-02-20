@@ -3,7 +3,7 @@
 import tensorflow as tf
 import numpy as np
 
-from tensorflow.python.ops.rnn_cell import LSTMStateTuple
+from tensorflow.contrib.rnn import LSTMStateTuple
 from tensorflow.contrib.framework import arg_scope
 from tensorflow.contrib import layers
 
@@ -58,7 +58,7 @@ class _BaseACNet(object):
         self.ops.sync = tf.group(*sync_ops, name="SyncWithGlobal")
 
     def _prepare_loss_op(self):
-        self.vars.a = tf.placeholder(tf.float32, [None], name="action")
+        self.vars.a = tf.placeholder(tf.int32, [None], name="action")
         self.vars.advantage = tf.placeholder(tf.float32, [None], name="advantage")
         self.vars.R = tf.placeholder(tf.float32, [None], name="R")
         # TODO add summaries for entropy, policy and value
@@ -230,7 +230,7 @@ class BasicLstmACNet(_BaseRcurrentACNet):
         return "basic_lstm_ac"
 
     def _get_ru_class(self):
-        return tf.nn.rnn_cell.BasicLSTMCell
+        return tf.contrib.rnn.BasicLSTMCell
 
 
 class LstmACNet(_BaseRcurrentACNet):

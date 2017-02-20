@@ -3,7 +3,7 @@
 import tensorflow as tf
 import numpy as np
 
-from tensorflow.python.ops.rnn_cell import LSTMStateTuple
+from tensorflow.contrib.rnn import LSTMStateTuple
 from tensorflow.contrib.framework import arg_scope
 from tensorflow.contrib import layers
 
@@ -54,7 +54,7 @@ class ADQNNet(object):
         self.ops.unfreeze = tf.group(*unfreeze_ops, name="UpdateTargetNetwork")
 
     def _prepare_loss_op(self):
-        self.vars.a = tf.placeholder(tf.float32, [None], name="action")
+        self.vars.a = tf.placeholder(tf.int32, [None], name="action")
         self.vars.advantage = tf.placeholder(tf.float32, [None], name="advantage")
         self.vars.target_q = tf.placeholder(tf.float32, [None], name="R")
         # TODO add summaries for entropy, policy and value

@@ -86,8 +86,8 @@ class A3CLearner(Thread):
             self._model_savefile = settings["models_path"] + "/" + self._run_string
             if self.write_summaries:
                 self.score = tf.placeholder(tf.float32)
-                tf.scalar_summary(self._run_string + "/mean_score", self.score)
-                self._summaries = tf.merge_all_summaries()
+                score_summary = tf.summary.scalar(self._run_string + "/mean_score", self.score)
+                self._summaries = tf.summary.merge([score_summary])
         else:
             self._model_savefile = None
 
@@ -282,9 +282,9 @@ class A3CLearner(Thread):
             if self._settings["run_tag"] is not None:
                 logdir += "/" + str(self._settings["run_tag"])
 
-            self._train_writer = tf.train.SummaryWriter(logdir + "/train")
+            self._train_writer = tf.summary.FileWriter(logdir + "/train")
             if self._run_tests:
-                self._test_writer = tf.train.SummaryWriter(logdir + "/test")
+                self._test_writer = tf.summary.FileWriter(logdir + "/test")
             else:
                 self._test_writer = None
             # TODO create saver

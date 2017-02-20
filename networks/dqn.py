@@ -56,10 +56,6 @@ class DQNNet(object):
         self._prepare_ops()
 
     def _prepare_ops(self):
-        pass
-        #     self.vars.a = tf.placeholder(tf.float32, [None, self._actions_num], name="action")
-        #     self.vars.R = tf.placeholder(tf.float32, [None], name="R")
-        #     self.ops.loss = 0.5 * tf.reduce_sum(tf.squared_difference(self.vars.R, self.ops.v))
         frozen_name_scope = self._name_scope + "/frozen"
 
         with arg_scope([layers.conv2d], activation_fn=self.activation_fn, data_format="NCHW"), \
