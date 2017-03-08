@@ -122,7 +122,7 @@ class FFACNet(_BaseACNet):
         conv_layers = default_conv_layers(self.vars.state_img, self._name_scope)
 
         if self.use_misc:
-            fc_input = tf.concat(concat_dim=1, values=[conv_layers, self.vars.state_misc])
+            fc_input = tf.concat(values=[conv_layers, self.vars.state_misc], axis=1)
         else:
             fc_input = conv_layers
 
@@ -151,12 +151,12 @@ class _BaseRcurrentACNet(_BaseACNet):
 
         conv_layers = default_conv_layers(self.vars.state_img, self._name_scope)
         if self.use_misc:
-            fc_input = tf.concat(concat_dim=1, values=[conv_layers, self.vars.state_misc])
+            fc_input = tf.concat(values=[conv_layers, self.vars.state_misc], axis=1)
         else:
             fc_input = conv_layers
 
-        #TODO add fc_units_num to settings
-        fc1_units_num=256
+        # TODO add fc_units_num to settings
+        fc1_units_num = 256
         fc1 = layers.fully_connected(fc_input, num_outputs=fc1_units_num,
                                      scope=self._name_scope + "/fc1",
                                      biases_initializer=tf.constant_initializer(0.1))

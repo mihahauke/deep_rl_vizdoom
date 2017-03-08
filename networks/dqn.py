@@ -95,7 +95,7 @@ class DQNNet(object):
             conv_layers = default_conv_layers(img_input, name_scope)
 
             if self.use_misc:
-                fc_input = tf.concat(concat_dim=1, values=[conv_layers, misc_input])
+                fc_input = tf.concat(values=[conv_layers, misc_input], axis=1, )
             else:
                 fc_input = conv_layers
 
@@ -141,7 +141,7 @@ class DuelingDQNNet(DQNNet):
             conv_layers = default_conv_layers(img_input, name_scope)
 
             if self.use_misc:
-                fc_input = tf.concat(concat_dim=1, values=[conv_layers, misc_input])
+                fc_input = tf.concat(values=[conv_layers, misc_input], axis=1)
             else:
                 fc_input = conv_layers
 
