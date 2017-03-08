@@ -1,3 +1,6 @@
+# Default scenario:
+config_file: basic.cfg
+
 threads_num: 16
 
 # Vizdoom wrapper options:

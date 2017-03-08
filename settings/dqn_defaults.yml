@@ -1,13 +1,21 @@
-# Default scenario and paths
-models_path: models
-logdir: logs
-run_tag: null
+# Default scenario:
+config_file: basic.cfg
+
+# Vizdoom wrapper options:
+resolution: [ 80, 60 ]
+frame_skip: 4
+stack_n_frames: 4
+use_freedoom: false
+display: false
+reward_scale: 1.0
+use_misc: true
+input_n_last_actions: false
 
 # Network
 network_type: DuelingDQNNet
 activation_fn: tf.nn.relu
 double: true
-prioritized_memory: true
+prioritized_memory: false
 batchsize: 64
 memory_capacity: 10000
 frozen_steps: 40000
@@ -36,16 +44,8 @@ epsilon_decay_start_step: 0
 
 gamma: 0.99
 
-# Vizdoom wrapper options:
-resolution: [ 80, 60 ]
-frame_skip: 4
-stack_n_frames: 4
-use_freedoom: false
-display: false
-reward_scale: 1.0
-use_misc: true
-input_n_last_actions: false
-
-
-
+# Misc
+models_path: models
+logdir: logs
+run_tag: null
 
