@@ -4,8 +4,7 @@ import numpy as np
 from tensorflow.contrib.framework import arg_scope
 from tensorflow.contrib import layers
 from util import Record
-from util.tfutil import gather_2d
-from .common import default_conv_layers
+from .common import default_conv_layers, gather_2d
 
 
 class DQNNet(object):

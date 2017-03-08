@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from tensorflow.contrib import layers
+import tensorflow as tf
 
 
 def default_conv_layers(img_input, name_scope):
@@ -24,3 +25,10 @@ def simplest_conv_layers(img_input, name_scope):
     conv2_flat = layers.flatten(conv2)
 
     return conv2_flat
+
+
+def gather_2d(tensor_2d, col_indices):
+    """ return: tensor_2d[:, col_indices]"""
+    col_indices = tf.to_int32(col_indices)
+    res = tf.gather_nd(tensor_2d, tf.stack([tf.range(tf.shape(tensor_2d)[0]), col_indices], 1))
+    return res

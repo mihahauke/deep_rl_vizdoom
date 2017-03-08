@@ -30,9 +30,11 @@ class DQN(object):
                  batchsize=32,
                  memory_capacity=10000,
                  update_pattern=(4, 4),
+                 prioritized_memory=False,
                  **settings):
 
-        if settings["prioritized_memory"]:
+        if prioritized_memory:
+            raise NotImplementedError("Prioritized memory not implemented")
             # TODO
             pass
 
@@ -68,8 +70,8 @@ class DQN(object):
         self._model_savefile = settings["models_path"] + "/" + self._run_string
         if self.write_summaries:
             self.score = tf.placeholder(tf.float32)
-            tf.scalar_summary(self._run_string + "/mean_score", self.score)
-            self._summaries = tf.merge_all_summaries()
+            score_summary = tf.summary.scalar(self._run_string + "/mean_score", self.score)
+            self._summaries = tf.summary.merge([score_summary])
 
         self.steps = 0
         # TODO epoch as tf variable?
@@ -114,7 +116,7 @@ class DQN(object):
         session = tf.InteractiveSession(config=config)
         session.run(tf.global_variables_initializer())
         print()
-        
+
         # Prefill replay memory:
         for _ in trange(self.replay_memory.capacity, leave=False, desc="Filling replay memory."):
             if self.doom_wrapper.is_terminal():
