@@ -242,4 +242,4 @@ class LstmACNet(_BaseRcurrentACNet):
         return "lstm_ac"
 
     def _get_ru_class(self):
-        return tf.nn.rnn_cell.LSTMCell
+        return tf.contrib.rnn.LSTMCell

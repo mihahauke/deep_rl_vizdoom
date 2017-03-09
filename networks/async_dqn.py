@@ -141,7 +141,7 @@ class ADQNLstmNet(ADQNNet):
         self.network_state = LSTMStateTuple(state_c, state_h)
 
     def _get_ru_class(self):
-        return tf.nn.rnn_cell.LSTMCell
+        return tf.contrib.rnn.LSTMCell
 
     def create_architecture(self):
         self.vars.sequence_length = tf.placeholder(tf.int64, [1], name="sequence_length")
