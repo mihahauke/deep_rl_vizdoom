@@ -1,27 +1,41 @@
 import argparse
 
+DEFAULT_SETTINGS_FILE = "settings/basic.yml"
 
-def parse_train_async_args():
-    parser = argparse.ArgumentParser(description='A3c implementation for ViZDoom in Tensorflow.')
-    parser.add_argument("-s", "--settings", dest="settings_yml", metavar='<SETTINGS_YAML_FILES>',
-                        default=["settings/basic.yml"], nargs="*",
-                        type=str, required=False, help="paths of yamls with settings")
-    parser.add_argument("-q", action="store_const", default=False, const=True,
-                        help="use n-step qlearning instead of a3c", dest="q")
+# Help messages:
+SETTINGS_HELP_MSG = "load settings from yaml files. " \
+                    "If multiple files are specified, overlapping settings " \
+                    "will be overwritten according to order of appearance " \
+                    "(e.g. settings from file #1 will be overwritten by file #2)."
+Q_HELP_MSG = "use n-step qlearning instead of a3c"
+
+
+def _add_commons(parser):
+    parser.add_argument("--settings", "-s",
+                        dest="settings_yml",
+                        metavar='YAML_FILE',
+                        nargs="*",
+                        type=str,
+                        default=[DEFAULT_SETTINGS_FILE],
+                        help=SETTINGS_HELP_MSG)
     # TODO run
     # TODO tag
     # TODO tags extension
+
+
+def parse_train_async_args():
+    parser = argparse.ArgumentParser(description='A3C implementation for ViZDoom in Tensorflow.',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    _add_commons(parser)
+    parser.add_argument("-q", action="store_const", default=False, const=True,
+                        help=Q_HELP_MSG, dest="q")
 
     return parser.parse_args()
 
 
 def parse_train_dqn_args():
-    parser = argparse.ArgumentParser(description='DQN implementation for ViZDoom in Tensorflow.')
-    parser.add_argument("-s", "--settings", dest="settings_yml", metavar='<SETTINGS_YAML_FILES>',
-                        default=["settings/basic.yml"], nargs="*",
-                        type=str, required=False, help="paths of yamls with settings")
-    # TODO run
-    # TODO tag
-    # TODO tags extension
+    parser = argparse.ArgumentParser(description='DQN implementation for ViZDoom in Tensorflow.',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    _add_commons(parser)
 
     return parser.parse_args()

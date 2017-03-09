@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL']='3'
+
 import ruamel.yaml as yaml
 from util.parsers import parse_train_dqn_args
 import os
 from dqn import DQN
+import networks
 
 if __name__ == "__main__":
     # TODO make tqdm work when stderr is redirected

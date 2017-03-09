@@ -115,7 +115,6 @@ class DQN(object):
         config.gpu_options.allow_growth = True
         session = tf.InteractiveSession(config=config)
         session.run(tf.global_variables_initializer())
-        print()
 
         # Prefill replay memory:
         for _ in trange(self.replay_memory.capacity, leave=False, desc="Filling replay memory."):

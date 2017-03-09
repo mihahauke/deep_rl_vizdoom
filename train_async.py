@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import ruamel.yaml as yaml
 import os
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+import ruamel.yaml as yaml
+
 from util.parsers import parse_train_async_args
 from util.coloring import green
 from async_learner import A3CLearner, ADQNLearner
 import networks
-
 
 def train_async(q_learning, settings):
     import tensorflow as tf
