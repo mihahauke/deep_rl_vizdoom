@@ -9,13 +9,14 @@ from util.parsers import parse_train_dqn_args
 import os
 from dqn import DQN
 from util.misc import print_settings
+from constants import DEFAULT_DQN_SETTINGS_FILE
 
 if __name__ == "__main__":
     # TODO make tqdm work when stderr is redirected
     # TODO print setup info on stderr and stdout
     args = parse_train_dqn_args()
 
-    default_settings_filepath = "settings/dqn_defaults.yml"
+    default_settings_filepath = DEFAULT_DQN_SETTINGS_FILE
     print("Loading default settings from:", default_settings_filepath)
     dqn_settings = yaml.safe_load(open(default_settings_filepath))
 

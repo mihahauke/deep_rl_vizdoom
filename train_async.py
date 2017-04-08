@@ -10,6 +10,7 @@ from util.coloring import green
 from async_learner import A3CLearner, ADQNLearner
 from util.misc import print_settings
 import networks
+from constants import DEFAULT_A3C_SETTINGS_FILE, DEFAULT_ADQN_SETTINGS_FILE
 
 
 def train_async(q_learning, settings):
@@ -83,9 +84,9 @@ if __name__ == "__main__":
     args = parse_train_async_args()
 
     if args.q:
-        default_settings_filepath = "settings/adqn_defaults.yml"
+        default_settings_filepath = DEFAULT_ADQN_SETTINGS_FILE
     else:
-        default_settings_filepath = "settings/a3c_defaults.yml"
+        default_settings_filepath = DEFAULT_A3C_SETTINGS_FILE
 
     print("Loading default settings from:", default_settings_filepath)
     settings = yaml.safe_load(open(default_settings_filepath))
