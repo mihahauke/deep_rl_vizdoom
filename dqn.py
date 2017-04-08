@@ -16,7 +16,7 @@ import networks
 
 class DQN(object):
     def __init__(self,
-                 network_type="DQNNet",
+                 network_type="networks.DQNNet",
                  write_summaries=True,
                  epochs=100,
                  train_steps_per_epoch=1000000,
@@ -55,9 +55,9 @@ class DQN(object):
         self.use_misc = self.doom_wrapper.use_misc
         self.actions_num = self.doom_wrapper.actions_num
         self.replay_memory = ReplayMemory(img_shape, misc_len, batch_size=batchsize, capacity=memory_capacity)
-        self.network = eval("networks." + network_type)(actions_num=self.actions_num, img_shape=img_shape,
-                                                        misc_len=misc_len,
-                                                        **settings)
+        self.network = eval(network_type)(actions_num=self.actions_num, img_shape=img_shape,
+                                          misc_len=misc_len,
+                                          **settings)
 
         self.batchsize = batchsize
         self.frozen_steps = frozen_steps

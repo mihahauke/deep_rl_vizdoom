@@ -9,33 +9,31 @@ from tensorflow.contrib import layers
 
 from util import Record
 
-from .common import default_conv_layers, gather_2d
+from .common import _BaseNetwork, gather_2d
 
 
 # TODO add dueling
-class ADQNNet(object):
+class ADQNNet(_BaseNetwork):
     def __init__(self,
-                 actions_num,
                  img_shape,
                  misc_len=0,
                  thread="global",
-                 activation_fn="tf.nn.relu",
-                 **ignored):
-        self.activation_fn = eval(activation_fn)
+                 **settings):
+
+        super(ADQNNet, self).__init__(**settings)
+
         self.ops = Record()
         self.vars = Record()
         self.vars.state_img = tf.placeholder(tf.float32, [None] + list(img_shape), name="state_img")
         self.use_misc = misc_len > 0
         if self.use_misc:
             self.vars.state_misc = tf.placeholder("float", [None, misc_len], name="state_misc")
-        self.actions_num = actions_num
         self._name_scope = self._get_name_scope() + "_" + str(thread)
 
         self.params = None
 
         with arg_scope([layers.conv2d], data_format="NCHW"), \
              arg_scope([layers.fully_connected, layers.conv2d], activation_fn=self.activation_fn):
-            # TODO make it configurable from yaml
             self.ops.q = self.create_architecture()
         self._prepare_loss_op()
         self.params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self._name_scope)
@@ -62,7 +60,7 @@ class ADQNNet(object):
         self.ops.loss = 0.5 * tf.reduce_sum((active_q - self.vars.target_q) ** 2)
 
     def create_architecture(self):
-        conv_layers = default_conv_layers(self.vars.state_img, self._name_scope)
+        conv_layers = self.get_conv_layers(self.vars.state_img, self._name_scope)
 
         if self.use_misc:
             fc_input = tf.concat(values=[conv_layers, self.vars.state_misc], axis=1)
@@ -145,7 +143,7 @@ class ADQNLstmNet(ADQNNet):
 
     def create_architecture(self):
         self.vars.sequence_length = tf.placeholder(tf.int64, [1], name="sequence_length")
-        conv_layers = default_conv_layers(self.vars.state_img, self._name_scope)
+        conv_layers = self.get_conv_layers(self.vars.state_img, self._name_scope)
 
         if self.use_misc:
             fc_input = tf.concat(values=[conv_layers, self.vars.state_misc], axis=1)

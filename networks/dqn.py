@@ -4,21 +4,19 @@ import numpy as np
 from tensorflow.contrib.framework import arg_scope
 from tensorflow.contrib import layers
 from util import Record
-from .common import default_conv_layers, gather_2d
+from .common import _BaseNetwork, gather_2d
 
 
-class DQNNet(object):
+class DQNNet(_BaseNetwork):
     def __init__(self,
-                 actions_num,
                  img_shape,
                  gamma,
                  misc_len=0,
                  double=True,
-                 activation_fn="tf.nn.relu",
                  **settings):
-        # TODO architecture customization from yaml
+        super(DQNNet, self).__init__(**settings)
         # TODO summaries to TB
-        self.activation_fn = eval(activation_fn)
+
         self.double = double
         self.gamma = np.float32(gamma)
         self.ops = Record()
@@ -32,7 +30,6 @@ class DQNNet(object):
         else:
             self.vars.state_misc = None
             self.vars.state2_misc = None
-        self._actions_num = actions_num
 
         self._name_scope = self._get_name_scope()
 
@@ -91,7 +88,7 @@ class DQNNet(object):
     def create_architecture(self, img_input, misc_input, name_scope, reuse=False):
         with arg_scope([layers.conv2d, layers.fully_connected], reuse=reuse), \
              arg_scope([], reuse=reuse):
-            conv_layers = default_conv_layers(img_input, name_scope)
+            conv_layers = self.get_conv_layers(img_input, name_scope)
 
             if self.use_misc:
                 fc_input = tf.concat(values=[conv_layers, misc_input], axis=1, )
@@ -99,7 +96,7 @@ class DQNNet(object):
                 fc_input = conv_layers
 
             fc1 = layers.fully_connected(fc_input, num_outputs=512, scope=name_scope + "/fc1")
-            q_op = layers.linear(fc1, num_outputs=self._actions_num, scope=name_scope + "/fc_q")
+            q_op = layers.linear(fc1, num_outputs=self.actions_num, scope=name_scope + "/fc_q")
 
             return q_op
 
@@ -137,7 +134,7 @@ class DuelingDQNNet(DQNNet):
     def create_architecture(self, img_input, misc_input, name_scope, reuse=False, **specs):
         with arg_scope([layers.conv2d, layers.fully_connected], reuse=reuse), \
              arg_scope([], reuse=reuse):
-            conv_layers = default_conv_layers(img_input, name_scope)
+            conv_layers = self.get_conv_layers(img_input, name_scope)
 
             if self.use_misc:
                 fc_input = tf.concat(values=[conv_layers, misc_input], axis=1)
@@ -150,7 +147,7 @@ class DuelingDQNNet(DQNNet):
             value = layers.linear(fc2_value, num_outputs=1, scope=name_scope + "/fc3_value")
 
             fc2_advantage = layers.fully_connected(fc1, num_outputs=256, scope=name_scope + "/fc2_advantage")
-            advantage = layers.linear(fc2_advantage, num_outputs=self._actions_num, scope=name_scope + "/fc3_advantage")
+            advantage = layers.linear(fc2_advantage, num_outputs=self.actions_num, scope=name_scope + "/fc3_advantage")
 
             mean_advantage = tf.reshape(tf.reduce_mean(advantage, axis=1), (-1, 1))
             q_op = advantage + (mean_advantage - value)

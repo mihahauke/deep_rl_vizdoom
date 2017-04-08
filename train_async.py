@@ -8,7 +8,9 @@ import ruamel.yaml as yaml
 from util.parsers import parse_train_async_args
 from util.coloring import green
 from async_learner import A3CLearner, ADQNLearner
+from util.misc import print_settings
 import networks
+
 
 def train_async(q_learning, settings):
     import tensorflow as tf
@@ -34,7 +36,8 @@ def train_async(q_learning, settings):
     optimizer = ClippingRMSPropOptimizer(learning_rate=global_learning_rate, **settings["rmsprop"])
 
     learners = []
-    network_class = eval("networks." + settings["network_type"])
+    network_class = eval(settings["network_type"])
+
     global_network = network_class(actions_num=actions_num, misc_len=misc_len, img_shape=img_shape,
                                    **settings)
     if q_learning:
@@ -90,5 +93,13 @@ if __name__ == "__main__":
         print("Loading settings from:", settings_fpath)
         override_settings = yaml.safe_load(open(settings_fpath))
         settings.update(override_settings)
+
+    print("Loaded settings:")
+    print_settings(settings)
+
+    if not os.path.isdir(settings["models_path"]):
+        os.makedirs(settings["models_path"])
+    if not os.path.isdir(settings["logdir"]):
+        os.makedirs(settings["logdir"])
 
     train_async(args.q, settings)

@@ -13,7 +13,7 @@ import os
 from vizdoom import SignalException, ViZDoomUnexpectedExitException
 from util import sec_to_str, threadsafe_print
 from vizdoom_wrapper import VizdoomWrapper
-from networks import *
+import networks
 
 
 class A3CLearner(Thread):
@@ -179,7 +179,7 @@ class A3CLearner(Thread):
     def test(self, sess):
         test_start_time = time.time()
         test_rewards = []
-        for _ in trange(self.test_episodes_per_epoch, leave=False):
+        for _ in trange(self.test_episodes_per_epoch, leave=False, file=sys.stdout, desc="Testing"):
             self.doom_wrapper.reset()
             if self.local_network.has_state():
                 self.local_network.reset_state()
@@ -447,7 +447,7 @@ class ADQNLearner(A3CLearner):
         # TODO maybe rmember state for training? SHould not matter so much bt still...
         test_start_time = time.time()
         test_rewards = []
-        for _ in trange(self.test_episodes_per_epoch, leave=False, file=sys.stdout):
+        for _ in trange(self.test_episodes_per_epoch, leave=False, file=sys.stdout, desc="Testing"):
             self.doom_wrapper.reset()
             if self.local_network.has_state():
                 self.local_network.reset_state()

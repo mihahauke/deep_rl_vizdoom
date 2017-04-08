@@ -9,26 +9,26 @@ from tensorflow.contrib import layers
 
 from util import Record
 
-from .common import default_conv_layers, gather_2d
+from .common import _BaseNetwork, gather_2d
 
 
-class _BaseACNet(object):
+class _BaseACNet(_BaseNetwork):
     def __init__(self,
-                 actions_num,
                  img_shape,
                  misc_len=0,
                  entropy_beta=0.01,
                  thread="global",
-                 activation_fn="tf.nn.relu",
-                 **ignored):
-        self.activation_fn = eval(activation_fn)
+                 **settings):
+
+        super(_BaseACNet, self).__init__(**settings)
+
         self.ops = Record()
         self.vars = Record()
         self.vars.state_img = tf.placeholder(tf.float32, [None] + list(img_shape), name="state_img")
         self.use_misc = misc_len > 0
         if self.use_misc:
             self.vars.state_misc = tf.placeholder("float", [None, misc_len], name="state_misc")
-        self._actions_num = actions_num
+
         self._name_scope = self._get_name_scope() + "_" + str(thread)
 
         self._params = None
@@ -42,7 +42,7 @@ class _BaseACNet(object):
         self._params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self._name_scope)
 
     def policy_value_layer(self, inputs):
-        pi = layers.fully_connected(inputs, num_outputs=self._actions_num,
+        pi = layers.fully_connected(inputs, num_outputs=self.actions_num,
                                     scope=self._name_scope + "/fc_pi",
                                     activation_fn=tf.nn.softmax)
         state_value = layers.linear(inputs, num_outputs=1, scope=self._name_scope + "/fc_value")
@@ -118,7 +118,7 @@ class FFACNet(_BaseACNet):
         return "ff_ac"
 
     def create_architecture(self):
-        conv_layers = default_conv_layers(self.vars.state_img, self._name_scope)
+        conv_layers = self.get_conv_layers(self.vars.state_img, self._name_scope)
 
         if self.use_misc:
             fc_input = tf.concat(values=[conv_layers, self.vars.state_misc], axis=1)
@@ -148,7 +148,7 @@ class _BaseRcurrentACNet(_BaseACNet):
     def create_architecture(self, **specs):
         self.vars.sequence_length = tf.placeholder(tf.int64, [1], name="sequence_length")
 
-        conv_layers = default_conv_layers(self.vars.state_img, self._name_scope)
+        conv_layers = self.get_conv_layers(self.vars.state_img, self._name_scope)
         if self.use_misc:
             fc_input = tf.concat(values=[conv_layers, self.vars.state_misc], axis=1)
         else:

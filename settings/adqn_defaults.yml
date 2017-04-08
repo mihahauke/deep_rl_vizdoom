@@ -18,8 +18,12 @@ models_path: models
 logdir: logs
 run_tag: null
 use_freedoom: false
-network_type: ADQNNet
+network_type: networks.ADQNNet
+conv_layers: [ 32, 64, 64 ]
+conv_sizes: [ 8, 4, 3 ]
+conv_strides: [ 4, 2, 1 ]
 activation_fn: tf.nn.relu
+recurrent_units_num: 256
 
 # General training options
 epochs: Inf
