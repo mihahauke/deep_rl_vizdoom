@@ -109,10 +109,10 @@ class _BaseACNet(_BaseNetwork):
         raise NotImplementedError()
 
 
-class FFACNet(_BaseACNet):
+class ACFFNet(_BaseACNet):
     def __init__(self,
                  **kwargs):
-        super(FFACNet, self).__init__(**kwargs)
+        super(ACFFNet, self).__init__(**kwargs)
 
     def _get_name_scope(self):
         return "ff_ac"
@@ -131,7 +131,7 @@ class FFACNet(_BaseACNet):
         return self.policy_value_layer(fc1)
 
 
-class _BaseRcurrentACNet(_BaseACNet):
+class _BaseACRecurrentNet(_BaseACNet):
     def __init__(self,
                  recurrent_units_num=256,
                  **settings
@@ -140,7 +140,7 @@ class _BaseRcurrentACNet(_BaseACNet):
         self.network_state = None
         # TODO make it configurable in jsons
         self._recurrent_units_num = recurrent_units_num
-        super(_BaseRcurrentACNet, self).__init__(**settings)
+        super(_BaseACRecurrentNet, self).__init__(**settings)
 
     def _get_ru_class(self):
         raise NotImplementedError()
@@ -182,7 +182,7 @@ class _BaseRcurrentACNet(_BaseACNet):
         self.network_state = LSTMStateTuple(state_c, state_h)
 
     def get_standard_feed_dict(self, state):
-        feed_dict = super(_BaseRcurrentACNet, self).get_standard_feed_dict(state)
+        feed_dict = super(_BaseACRecurrentNet, self).get_standard_feed_dict(state)
         feed_dict[self.vars.initial_network_state] = self.network_state,
         feed_dict[self.vars.sequence_length] = [1]
         return feed_dict
@@ -192,7 +192,7 @@ class _BaseRcurrentACNet(_BaseACNet):
             pi, v, self.network_state = sess.run([self.ops.pi, self.ops.v, self.ops.network_state],
                                                  feed_dict=self.get_standard_feed_dict(state))
         else:
-            pi, v = super(_BaseRcurrentACNet, self).get_policy_and_value(sess, state)
+            pi, v = super(_BaseACRecurrentNet, self).get_policy_and_value(sess, state)
         return pi[0], v[0]
 
     def get_policy(self, sess, state, update_state=True):
@@ -200,7 +200,7 @@ class _BaseRcurrentACNet(_BaseACNet):
             pi, self.network_state = sess.run([self.ops.pi, self.ops.network_state],
                                               feed_dict=self.get_standard_feed_dict(state))
         else:
-            pi = super(_BaseRcurrentACNet, self).get_policy(sess, state)
+            pi = super(_BaseACRecurrentNet, self).get_policy(sess, state)
 
         return pi[0]
 
@@ -209,7 +209,7 @@ class _BaseRcurrentACNet(_BaseACNet):
             v, self.network_state = sess.run([self.ops.v, self.ops.network_state],
                                              feed_dict=self.get_standard_feed_dict(state))
         else:
-            v = super(_BaseRcurrentACNet, self).get_value(sess, state)
+            v = super(_BaseACRecurrentNet, self).get_value(sess, state)
         return v
 
     def get_current_network_state(self):
@@ -219,11 +219,11 @@ class _BaseRcurrentACNet(_BaseACNet):
         return True
 
 
-class BasicLstmACNet(_BaseRcurrentACNet):
+class ASBacisLSTMNet(_BaseACRecurrentNet):
     def __init__(self,
                  **settings
                  ):
-        super(BasicLstmACNet, self).__init__(**settings)
+        super(ASBacisLSTMNet, self).__init__(**settings)
 
     def _get_name_scope(self):
         return "basic_lstm_ac"
@@ -232,11 +232,11 @@ class BasicLstmACNet(_BaseRcurrentACNet):
         return tf.contrib.rnn.BasicLSTMCell
 
 
-class LstmACNet(_BaseRcurrentACNet):
+class ACLSTMNet(_BaseACRecurrentNet):
     def __init__(self,
                  **settings
                  ):
-        super(LstmACNet, self).__init__(**settings)
+        super(ACLSTMNet, self).__init__(**settings)
 
     def _get_name_scope(self):
         return "lstm_ac"
