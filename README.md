@@ -7,9 +7,9 @@
 - [tqdm](https://pypi.python.org/pypi/tqdm)
 - [ruamel.yaml](https://pypi.python.org/pypi/ruamel.yaml/0.13.4)
 
-To install pyton dependecies:
+To install python dependecies:
 ```
-sudo3 pip3 install numpy tqdm ruamel.yaml 
+sudo pip3 install numpy tqdm ruamel.yaml 
 ```
 
 ## Implemented algorithms:
