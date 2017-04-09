@@ -18,9 +18,10 @@ class ADQNNet(_BaseNetwork):
                  img_shape,
                  misc_len=0,
                  thread="global",
+                 fc_units_num=512,
                  **settings):
 
-        super(ADQNNet, self).__init__(**settings)
+        super(ADQNNet, self).__init__(fc_units_num=fc_units_num, **settings)
 
         self.ops = Record()
         self.vars = Record()
@@ -67,7 +68,7 @@ class ADQNNet(_BaseNetwork):
         else:
             fc_input = conv_layers
 
-        fc1 = layers.fully_connected(fc_input, num_outputs=512, scope=self._name_scope + "/fc1")
+        fc1 = layers.fully_connected(fc_input, num_outputs=self.fc_units_num, scope=self._name_scope + "/fc1")
         q = layers.linear(fc1, num_outputs=self.actions_num, scope=self._name_scope + "/q")
         return q
 
@@ -99,11 +100,11 @@ class ADQNNet(_BaseNetwork):
 
 
 class ADQNLstmNet(ADQNNet):
-    def __init__(self, recurrent_units_num=256, **kwargs):
+    def __init__(self, recurrent_units_num=256, fc_units_num=256, **kwargs):
         self.network_state = None
         self.recurrent_cells = None
         self._recurrent_units_num = recurrent_units_num
-        super(ADQNLstmNet, self).__init__(**kwargs)
+        super(ADQNLstmNet, self).__init__(fc_units_num=fc_units_num, **kwargs)
 
     def has_state(self):
         return True
@@ -149,10 +150,8 @@ class ADQNLstmNet(ADQNNet):
             fc_input = tf.concat(values=[conv_layers, self.vars.state_misc], axis=1)
         else:
             fc_input = conv_layers
-        # TODO add fc units num in settings
-        fc_units_num = 256
-        fc1 = layers.fully_connected(fc_input, fc_units_num, scope=self._name_scope + "/fc1")
-        fc1_reshaped = tf.reshape(fc1, [1, -1, fc_units_num])
+        fc1 = layers.fully_connected(fc_input, self.fc_units_num, scope=self._name_scope + "/fc1")
+        fc1_reshaped = tf.reshape(fc1, [1, -1, self.fc_units_num])
 
         self.recurrent_cells = self._get_ru_class()(self._recurrent_units_num)
         state_c = tf.placeholder(tf.float32, [1, self.recurrent_cells.state_size.c], name="initial_lstm_state_c")

@@ -16,6 +16,8 @@ network_type: networks.DuelingDQNNet
 conv_layers: [ 32, 64, 64 ]
 conv_sizes: [ 8, 4, 3 ]
 conv_strides: [ 4, 2, 1 ]
+fc_units_num: 256
+
 activation_fn: tf.nn.relu
 double: true
 prioritized_memory: false

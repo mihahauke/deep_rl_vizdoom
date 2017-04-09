@@ -95,7 +95,7 @@ class DQNNet(_BaseNetwork):
             else:
                 fc_input = conv_layers
 
-            fc1 = layers.fully_connected(fc_input, num_outputs=512, scope=name_scope + "/fc1")
+            fc1 = layers.fully_connected(fc_input, num_outputs=self.fc_units_num, scope=name_scope + "/fc1")
             q_op = layers.linear(fc1, num_outputs=self.actions_num, scope=name_scope + "/fc_q")
 
             return q_op
@@ -141,7 +141,7 @@ class DuelingDQNNet(DQNNet):
             else:
                 fc_input = conv_layers
 
-            fc1 = layers.fully_connected(fc_input, num_outputs=512, scope=name_scope + "/fc1")
+            fc1 = layers.fully_connected(fc_input, num_outputs=self.fc_units_num, scope=name_scope + "/fc1")
 
             fc2_value = layers.fully_connected(fc1, num_outputs=256, scope=name_scope + "/fc2_value")
             value = layers.linear(fc2_value, num_outputs=1, scope=name_scope + "/fc3_value")

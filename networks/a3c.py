@@ -125,7 +125,7 @@ class ACFFNet(_BaseACNet):
         else:
             fc_input = conv_layers
 
-        fc1 = layers.fully_connected(fc_input, num_outputs=512, scope=self._name_scope + "/fc1",
+        fc1 = layers.fully_connected(fc_input, num_outputs=self.fc_units_num, scope=self._name_scope + "/fc1",
                                      biases_initializer=tf.constant_initializer(0.1))
 
         return self.policy_value_layer(fc1)
@@ -154,13 +154,11 @@ class _BaseACRecurrentNet(_BaseACNet):
         else:
             fc_input = conv_layers
 
-        # TODO add fc_units_num to settings
-        fc1_units_num = 256
-        fc1 = layers.fully_connected(fc_input, num_outputs=fc1_units_num,
+        fc1 = layers.fully_connected(fc_input, num_outputs=self.fc_units_num,
                                      scope=self._name_scope + "/fc1",
                                      biases_initializer=tf.constant_initializer(0.1))
 
-        fc1_reshaped = tf.reshape(fc1, [1, -1, fc1_units_num])
+        fc1_reshaped = tf.reshape(fc1, [1, -1, self.fc_units_num])
         self.recurrent_cells = self._get_ru_class()(self._recurrent_units_num)
         state_c = tf.placeholder(tf.float32, [1, self.recurrent_cells.state_size.c], name="initial_lstm_state_c")
         state_h = tf.placeholder(tf.float32, [1, self.recurrent_cells.state_size.h], name="initial_lstm_state_h")

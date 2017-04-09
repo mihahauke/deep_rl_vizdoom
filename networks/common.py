@@ -35,12 +35,14 @@ class _BaseNetwork(object):
                  conv_sizes=(8, 4, 3),
                  conv_strides=(4, 2, 1),
                  activation_fn="tf.nn.relu",
+                 fc_units_num=256,
                  **ignored):
         self.actions_num = actions_num
         self.conv_layers = conv_layers
         self.conv_sizes = conv_sizes
         self.conv_strides = conv_strides
         self.activation_fn = eval(activation_fn)
+        self.fc_units_num = fc_units_num
 
     def get_conv_layers(self, img_input, name_scope):
         return create_conv_layers(img_input, name_scope, self.conv_layers, self.conv_sizes, self.conv_strides)
