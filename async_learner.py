@@ -5,7 +5,7 @@ import random
 import time
 from tqdm import trange
 from threading import Thread
-from util.coloring import red, green, blue
+from util.coloring import red, green, blue,yellow
 from time import strftime
 import tensorflow as tf
 import sys
@@ -13,7 +13,9 @@ import os
 from vizdoom import SignalException, ViZDoomUnexpectedExitException
 from util import sec_to_str, threadsafe_print
 from vizdoom_wrapper import VizdoomWrapper
+from util.logger import log
 import networks
+import logging
 
 
 class A3CLearner(Thread):
@@ -23,27 +25,31 @@ class A3CLearner(Thread):
                  optimizer,
                  network_type,
                  write_summaries=True,
+                 enable_progress_bar=True,
                  **settings):
         super(A3CLearner, self).__init__()
 
-        print("Creating actor-learner #{}.".format(thread_index))
+        log("Creating actor-learner #{}.".format(thread_index))
         self.thread_index = thread_index
         self.write_summaries = write_summaries
         self._settings = settings
-        if self.write_summaries:
-            date_string = strftime("%d.%m.%y-%H:%M")
+        if self.write_summaries and thread_index == 0:
+            date_string = strftime("%d.%m.%y_%H-%M")
             self._run_string = "{}/{}_{}th/{}".format(settings["base_tag"],
                                                       network_type,
                                                       settings["threads_num"],
                                                       date_string)
+            self.tf_logdir = settings["tf_logdir"]
+            self.tf_models_path = settings["models_path"]
+            if self.tf_logdir is not None:
+                if self._settings["run_tag"] is not None:
+                    self.tf_logdir += "/" + str(self._settings["run_tag"])
+                if not os.path.isdir(settings["tf_logdir"]):
+                    os.makedirs(settings["tf_logdir"])
 
-            if settings["logdir"] is not None:
-                if not os.path.isdir(settings["logdir"]):
-                    os.makedirs(settings["logdir"])
-
-        # if settings["models_path"] is not None:
-        #     if not os.path.isdir(settings["models_path"]):
-        #         os.makedirs(settings["models_path"])
+            if self.tf_models_path is not None:
+                if not os.path.isdir(settings["models_path"]):
+                    os.makedirs(settings["models_path"])
 
         self.local_steps_per_epoch = settings["local_steps_per_epoch"]
         self._run_tests = settings["test_episodes_per_epoch"] > 0 and settings["run_tests"]
@@ -94,6 +100,7 @@ class A3CLearner(Thread):
         self._saver = None
         self._session = None
         self._global_steps_counter = None
+        self.enable_progress_bar = enable_progress_bar
 
     @staticmethod
     def choose_action_index(policy, deterministic=False):
@@ -179,7 +186,8 @@ class A3CLearner(Thread):
     def test(self, sess):
         test_start_time = time.time()
         test_rewards = []
-        for _ in trange(self.test_episodes_per_epoch, leave=False, file=sys.stdout, desc="Testing"):
+        for _ in trange(self.test_episodes_per_epoch, desc="Testing", file=sys.stdout,
+                        leave=False, disable=not self.enable_progress_bar):
             self.doom_wrapper.reset()
             if self.local_network.has_state():
                 self.local_network.reset_state()
@@ -202,7 +210,7 @@ class A3CLearner(Thread):
         max_score = np.max(test_rewards)
         mean_score = np.mean(test_rewards)
         score_std = np.std(test_rewards)
-        print(
+        log(
             "TEST: mean: {}, min: {}, max: {} ,test time: {}".format(
                 green("{:0.3f}±{:0.2f}".format(mean_score, score_std)),
                 red("{:0.3f}".format(min_score)),
@@ -222,7 +230,7 @@ class A3CLearner(Thread):
         local_steps_per_sec = steps / (current_time - last_log_time)
         global_steps_per_sec = global_steps / elapsed_time
         global_mil_steps_per_hour = global_steps_per_sec * 3600 / 1000000.0
-        print(
+        log(
             "TRAIN: {}(GlobalSteps) ,mean: {}, min: {}, max: {}, "
             " LocalSpd: {:.0f} STEPS/s GlobalSpd: "
             "{} STEPS/s, {:.2f}M STEPS/hour, total elapsed time: {}".format(
@@ -270,7 +278,7 @@ class A3CLearner(Thread):
 
                         last_log_time = time.time()
                         local_steps_for_log = 0
-                        print()
+                        log("")
 
         except (SignalException, ViZDoomUnexpectedExitException):
             threadsafe_print(red("Thread #{} aborting(ViZDoom killed).".format(self.thread_index)))
@@ -278,13 +286,9 @@ class A3CLearner(Thread):
     def run_training(self, session, global_steps_counter):
         self._session = session
         if self.thread_index == 0:
-            logdir = self._settings["logdir"]
-            if self._settings["run_tag"] is not None:
-                logdir += "/" + str(self._settings["run_tag"])
-
-            self._train_writer = tf.summary.FileWriter(logdir + "/train")
+            self._train_writer = tf.summary.FileWriter(self.tf_logdir + "/train")
             if self._run_tests:
-                self._test_writer = tf.summary.FileWriter(logdir + "/test")
+                self._test_writer = tf.summary.FileWriter(self.tf_logdir + "/test")
             else:
                 self._test_writer = None
             # TODO create saver
@@ -415,6 +419,10 @@ class ADQNLearner(A3CLearner):
                     # TODO this check is dangerous
                     if global_steps >= next_target_update:
                         next_target_update += self.frozen_global_steps
+                        if next_target_update <= global_steps:
+                            logging.warning(yellow("Global steps ({}) <= next target update ({}).".format(
+                                global_steps, next_target_update)))
+
                         self._session.run(self.global_network.ops.unfreeze)
                 # Logs & tests
                 if self.local_steps_per_epoch * self._epoch <= self.local_steps:
@@ -438,16 +446,17 @@ class ADQNLearner(A3CLearner):
 
                         last_log_time = time.time()
                         local_steps_for_log = 0
-                        print()
+                        log("")
 
         except (SignalException, ViZDoomUnexpectedExitException):
             threadsafe_print(red("Thread #{} aborting(ViZDoom killed).".format(self.thread_index)))
 
     def test(self, sess):
-        # TODO maybe rmember state for training? SHould not matter so much bt still...
+        # TODO maybe remember state for training? Should not matter so much but still...
         test_start_time = time.time()
         test_rewards = []
-        for _ in trange(self.test_episodes_per_epoch, leave=False, file=sys.stdout, desc="Testing"):
+        for _ in trange(self.test_episodes_per_epoch,  desc="Testing",
+                        leave=False, disable=not self.enable_progress_bar, file=sys.stdout):
             self.doom_wrapper.reset()
             if self.local_network.has_state():
                 self.local_network.reset_state()
@@ -470,7 +479,7 @@ class ADQNLearner(A3CLearner):
         max_score = np.max(test_rewards)
         mean_score = np.mean(test_rewards)
         score_std = np.std(test_rewards)
-        print(
+        log(
             "TEST: mean: {}, min: {}, max: {}, test time: {}".format(
                 green("{:0.3f}±{:0.2f}".format(mean_score, score_std)),
                 red("{:0.3f}".format(min_score)),

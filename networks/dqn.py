@@ -15,7 +15,6 @@ class DQNNet(_BaseNetwork):
                  double=True,
                  **settings):
         super(DQNNet, self).__init__(**settings)
-        # TODO summaries to TB
 
         self.double = double
         self.gamma = np.float32(gamma)

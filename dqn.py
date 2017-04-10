@@ -11,6 +11,8 @@ from replay_memory import ReplayMemory
 from time import time
 from util.coloring import red, green, blue
 from util import sec_to_str
+from util.logger import log
+import sys
 import networks
 
 
@@ -31,17 +33,18 @@ class DQN(object):
                  memory_capacity=10000,
                  update_pattern=(4, 4),
                  prioritized_memory=False,
+                 enable_progress_bar=True,
                  **settings):
 
         if prioritized_memory:
-            raise NotImplementedError("Prioritized memory not implemented")
+            raise NotImplementedError("Prioritized memory not implemented. Maybe some day.")
             # TODO
             pass
 
         self.update_pattern = update_pattern
         self.write_summaries = write_summaries
         self._settings = settings
-        date_string = strftime("%d.%m.%y-%H:%M")
+        date_string = strftime("%d.%m.%y_%H-%M")
         self._run_string = "{}/{}/{}".format(settings["base_tag"], network_type, date_string)
         self.train_steps_per_epoch = train_steps_per_epoch
         self._run_tests = test_episodes_per_epoch > 0 and run_tests
@@ -83,10 +86,13 @@ class DQN(object):
         self.initial_epsilon = initial_epsilon
         self.final_epsilon = final_epsilon
 
+        self.enable_progress_bar = enable_progress_bar
+
     def get_current_epsilon(self):
         eps = self.initial_epsilon - (self.steps - self.epsilon_decay_start_step) * self.epsilon_decay_rate
         return np.clip(eps, self.final_epsilon, 1.0)
 
+    @staticmethod
     def print_epoch_log(self, prefix, scores, steps, epoch_time):
         mean_score = np.mean(scores)
         score_std = np.std(scores)
@@ -96,7 +102,7 @@ class DQN(object):
 
         steps_per_sec = steps / epoch_time
         mil_steps_per_hour = steps_per_sec * 3600 / 1000000.0
-        print(
+        log(
             "{}: Episodes: {}, mean: {}, min: {}, max: {}, "
             " Speed: {:.0f} STEPS/s, {:.2f}M STEPS/hour, time: {}".format(
                 prefix,
@@ -117,7 +123,8 @@ class DQN(object):
         session.run(tf.global_variables_initializer())
 
         # Prefill replay memory:
-        for _ in trange(self.replay_memory.capacity, leave=False, desc="Filling replay memory."):
+        for _ in trange(self.replay_memory.capacity, desc="Filling replay memory",
+                        leave=False, disable=not self.enable_progress_bar, file=sys.stdout):
             if self.doom_wrapper.is_terminal():
                 self.doom_wrapper.reset()
             s1 = self.doom_wrapper.get_current_state()
@@ -135,7 +142,8 @@ class DQN(object):
             test_scores = []
             train_start_time = time()
 
-            for _ in trange(self.train_steps_per_epoch, leave=False, desc="Training, epoch {}".format(self._epoch)):
+            for _ in trange(self.train_steps_per_epoch, desc="Training, epoch {}".format(self._epoch),
+                            leave=False, disable=not self.enable_progress_bar, file=sys.stdout):
                 self.steps += 1
                 s1 = self.doom_wrapper.get_current_state()
 
@@ -160,12 +168,13 @@ class DQN(object):
 
             train_time = time() - train_start_time
 
-            print("Epoch", self._epoch)
-            print("Training steps:", self.steps, ", epsilon:", self.get_current_epsilon())
+            log("Epoch {}".format(self._epoch))
+            log("Training steps: {}, epsilon: {}".format(self.steps, self.get_current_epsilon()))
             self.print_epoch_log("TRAIN", train_scores, self.train_steps_per_epoch, train_time)
             test_start_time = time()
             test_steps = 0
-            for _ in trange(self.test_episodes_per_epoch, leave=False, desc="Testing, epoch {}".format(self._epoch)):
+            for _ in trange(self.test_episodes_per_epoch, desc="Testing, epoch {}".format(self._epoch),
+                            leave=False, disable=not self.enable_progress_bar, file=sys.stdout):
                 self.doom_wrapper.reset()
                 while not self.doom_wrapper.is_terminal():
                     test_steps += 1
@@ -179,6 +188,5 @@ class DQN(object):
             overall_time = time() - overall_start_time
 
             self.print_epoch_log("TEST", test_scores, test_steps, test_time)
-            print("Total elapsed time:", sec_to_str(overall_time))
-            print()
+            log("Total elapsed time: {}\n".format(sec_to_str(overall_time)))
             self._epoch += 1

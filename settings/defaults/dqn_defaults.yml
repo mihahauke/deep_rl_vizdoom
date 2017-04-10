@@ -1,24 +1,7 @@
-# Default scenario:
-config_file: basic.cfg
-
-# Vizdoom wrapper options:
-resolution: [ 80, 60 ]
-frame_skip: 4
-stack_n_frames: 4
-use_freedoom: false
-display: false
-reward_scale: 1.0
-use_misc: true
-input_n_last_actions: false
-
 # Network
 network_type: networks.DuelingDQNNet
-conv_layers: [ 32, 64, 64 ]
-conv_sizes: [ 8, 4, 3 ]
-conv_strides: [ 4, 2, 1 ]
 fc_units_num: 256
 
-activation_fn: tf.nn.relu
 double: true
 prioritized_memory: false
 batchsize: 64
@@ -27,9 +10,7 @@ frozen_steps: 40000
 update_pattern: [4, 4]
 
 # Training params
-epochs: Inf
 train_steps_per_epoch: 1000000
-test_episodes_per_epoch: 100
 rmsprop:
   epsilon: 1e-10
   decay: 0.99
@@ -49,8 +30,5 @@ epsilon_decay_start_step: 0
 
 gamma: 0.99
 
-# Misc
-models_path: models
-logdir: logs
-run_tag: null
+
 

@@ -8,3 +8,7 @@ def green(sthg):
 
 def blue(sthg):
     return "\033[01;34m{0}\033[00m".format(str(sthg))
+
+
+def yellow(sthg):
+    return "\033[01;93m{0}\033[00m".format(str(sthg))

@@ -3,14 +3,14 @@
 import os
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-import ruamel.yaml as yaml
 
+from constants import *
 from util.parsers import parse_train_async_args
 from util.coloring import green
 from async_learner import A3CLearner, ADQNLearner
-from util.misc import print_settings
+from util.misc import print_settings, load_settings
+from util.logger import setup_file_logging, log
 import networks
-from constants import DEFAULT_A3C_SETTINGS_FILE, DEFAULT_ADQN_SETTINGS_FILE
 
 
 def train_async(q_learning, settings):
@@ -63,15 +63,15 @@ def train_async(q_learning, settings):
     config.gpu_options.allow_growth = True
     session = tf.Session(config=config)
 
-    print("Initializing variables...")
+    log("Initializing variables...")
     session.run(tf.global_variables_initializer())
-    print("Initialization finished.\n")
+    log("Initialization finished.\n")
     global_steps_counter = ThreadsafeCounter()
 
     if q_learning:
         session.run(global_network.ops.unfreeze)
-    # TODO print settings
-    print(green("Launching training."))
+
+        log(green("Launching training."))
     for l in learners:
         l.run_training(session, global_steps_counter=global_steps_counter)
     for l in learners:
@@ -79,8 +79,6 @@ def train_async(q_learning, settings):
 
 
 if __name__ == "__main__":
-    # TODO make tqdm work when stderr is redirected
-    # TODO print setup info on stderr and stdout
     args = parse_train_async_args()
 
     if args.q:
@@ -88,19 +86,13 @@ if __name__ == "__main__":
     else:
         default_settings_filepath = DEFAULT_A3C_SETTINGS_FILE
 
-    print("Loading default settings from:", default_settings_filepath)
-    settings = yaml.safe_load(open(default_settings_filepath))
-    for settings_fpath in args.settings_yml:
-        print("Loading settings from:", settings_fpath)
-        override_settings = yaml.safe_load(open(settings_fpath))
-        settings.update(override_settings)
+    settings = load_settings(default_settings_filepath, args.settings_yml)
 
-    print("Loaded settings:")
+    if settings["logfile"] is not None:
+        log("Setting up file logging to: {}".format(settings["logfile"]))
+        setup_file_logging(settings["logfile"], add_date=True)
+
+    log("Loaded settings:")
     print_settings(settings)
-
-    if not os.path.isdir(settings["models_path"]):
-        os.makedirs(settings["models_path"])
-    if not os.path.isdir(settings["logdir"]):
-        os.makedirs(settings["logdir"])
 
     train_async(args.q, settings)

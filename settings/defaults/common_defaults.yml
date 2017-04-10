@@ -1,0 +1,30 @@
+config_file: basic.cfg
+run_tag: default_basic
+
+# Convolution layers params layers:
+conv_layers: [ 32, 64, 64 ]
+conv_sizes: [ 8, 4, 3 ]
+conv_strides: [ 4, 2, 1 ]
+
+# Some output directories
+models_path: models
+logdir: logs
+logfile: null
+tf_logdir: tf_logs
+epochs: Inf
+
+activation_fn: tf.nn.relu
+test_episodes_per_epoch: 100
+
+# Vizdoom wrapper options:
+resolution: [ 80, 60 ]
+frame_skip: 4
+stack_n_frames: 4
+use_freedoom: false
+display: false
+reward_scale: 1.0
+misc_scale: null
+use_misc: true
+input_n_last_actions: false
+
+enable_progress_bar: true
