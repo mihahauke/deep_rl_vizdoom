@@ -13,9 +13,7 @@ if __name__ == "__main__":
     args = parse_train_dqn_args()
     settings = load_settings(DEFAULT_DQN_SETTINGS_FILE, args.settings_yml)
 
-    if settings["logfile"] is not None:
-        log("Setting up file logging to: {}".format(settings["logfile"]))
-        setup_file_logger(settings["logfile"], add_date=True)
+    setup_file_logger(settings["logfile"], add_date=True)
 
     log("Loaded settings:")
     print_settings(settings)

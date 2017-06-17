@@ -10,6 +10,13 @@ def get_logger():
     logger = logging.getLogger("default_logger")
     return logger
 
+# TODO different formatting for levels ...
+_logger = get_logger()
+log = _logger.info
+warn = _logger.warn
+error = _logger.error
+debug = _logger.debug
+
 
 def setup_file_logger(logfile=None, append=True, add_date=False):
     if logfile is not None:
@@ -29,7 +36,4 @@ def setup_file_logger(logfile=None, append=True, add_date=False):
         handler = logging.FileHandler(logfile, mode=file_mode)
         logger = get_logger()
         logger.addHandler(handler)
-
-
-_logger = get_logger()
-log = _logger.info
+    log("Setting up file logging to: {}".format(logfile))
