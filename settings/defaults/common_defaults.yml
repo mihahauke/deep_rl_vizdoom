@@ -28,3 +28,4 @@ use_misc: true
 input_n_last_actions: false
 
 enable_progress_bar: true
+tf_log_level: 1

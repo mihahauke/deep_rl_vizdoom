@@ -11,7 +11,7 @@ def get_logger():
     return logger
 
 
-def setup_file_logging(logfile=None, append=True, add_date=False):
+def setup_file_logger(logfile=None, append=True, add_date=False):
     if logfile is not None:
         if add_date:
             if logfile.endswith(".log"):

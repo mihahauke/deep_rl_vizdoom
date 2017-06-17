@@ -2,14 +2,12 @@
 # -*- coding: utf-8 -*-
 import os
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
 from constants import *
 from util.parsers import parse_train_async_args
 from util.coloring import green
 from async_learner import A3CLearner, ADQNLearner
 from util.misc import print_settings, load_settings
-from util.logger import setup_file_logging, log
+from util.logger import setup_file_logger, log
 import networks
 
 
@@ -90,9 +88,11 @@ if __name__ == "__main__":
 
     if settings["logfile"] is not None:
         log("Setting up file logging to: {}".format(settings["logfile"]))
-        setup_file_logging(settings["logfile"], add_date=True)
+        setup_file_logger(settings["logfile"], add_date=True)
 
     log("Loaded settings:")
     print_settings(settings)
+
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(settings["tf_log_level"])
 
     train_async(args.q, settings)
