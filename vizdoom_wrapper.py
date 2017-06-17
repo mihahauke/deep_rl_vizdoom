@@ -116,9 +116,11 @@ class VizdoomWrapper(object):
             self._current_stacked_misc = np.zeros_like(self._current_stacked_misc)
             self._update_misc()
 
-    def make_action(self, action_index):
+    def make_action(self, action_index, frameskip=None):
+        if frameskip is None:
+            frameskip = self._frame_skip
         action = self._actions[action_index]
-        reward = self.doom.make_action(action, self._frame_skip) * self._reward_scale
+        reward = self.doom.make_action(action, frameskip) * self._reward_scale
         if not self.doom.is_episode_finished():
             if self.input_n_last_actions:
                 self.last_n_actions[0:-self.actions_num] = self.last_n_actions[self.actions_num:]
