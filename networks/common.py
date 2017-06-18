@@ -13,7 +13,7 @@ def create_conv_layers(img_input, name_scope, conv_layers=(32, 64, 64), conv_siz
 
     last_layer = img_input
     for i, [nout, ksize, stride] in enumerate(zip(conv_layers, conv_sizes, conv_strides)):
-        last_layer = layers.conv2d(img_input, num_outputs=nout,
+        last_layer = layers.conv2d(last_layer, num_outputs=nout,
                                    kernel_size=ksize, stride=stride,
                                    padding="VALID", scope=name_scope + "/conv" + str(i))
 
