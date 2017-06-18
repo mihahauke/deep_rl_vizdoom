@@ -217,11 +217,11 @@ class _BaseACRecurrentNet(_BaseACNet):
         return True
 
 
-class ASBacisLSTMNet(_BaseACRecurrentNet):
+class ASBacisLstmNet(_BaseACRecurrentNet):
     def __init__(self,
                  **settings
                  ):
-        super(ASBacisLSTMNet, self).__init__(**settings)
+        super(ASBacisLstmNet, self).__init__(**settings)
 
     def _get_name_scope(self):
         return "basic_lstm_ac"
@@ -230,11 +230,11 @@ class ASBacisLSTMNet(_BaseACRecurrentNet):
         return tf.contrib.rnn.BasicLSTMCell
 
 
-class ACLSTMNet(_BaseACRecurrentNet):
+class ACLstmNet(_BaseACRecurrentNet):
     def __init__(self,
                  **settings
                  ):
-        super(ACLSTMNet, self).__init__(**settings)
+        super(ACLstmNet, self).__init__(**settings)
 
     def _get_name_scope(self):
         return "lstm_ac"
