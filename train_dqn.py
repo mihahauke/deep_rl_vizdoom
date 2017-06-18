@@ -16,7 +16,7 @@ if __name__ == "__main__":
 
     setup_file_logger(settings["logfile"], add_date=True)
 
-    log("Loaded settings:")
+    log("Settings:")
     print_settings(settings)
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(settings["tf_log_level"])

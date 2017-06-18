@@ -58,7 +58,6 @@ class DQN(object):
         self._epochs = np.float32(epochs)
 
         self.doom_wrapper = VizdoomWrapper(**settings)
-        self.doom_wrapper = VizdoomWrapper(**settings)
         misc_len = self.doom_wrapper.misc_len
         img_shape = self.doom_wrapper.img_shape
         self.use_misc = self.doom_wrapper.use_misc
@@ -73,7 +72,7 @@ class DQN(object):
 
         self.save_interval = save_interval
 
-        self._model_savefile = settings["models_path"] + "/" + self._run_string
+        self._model_savefile = settings["models_path"] + "/" + self._run_string + ".ckpt"
         if self.write_summaries:
             self.scores_placeholder, summaries = setup_vector_summaries(scenario_tag + "/scores")
             self._summaries = tf.summary.merge(summaries)
@@ -121,6 +120,23 @@ class DQN(object):
                 mil_steps_per_hour,
                 sec_to_str(epoch_time)
             ))
+
+    def save_model(self, session, savefile=None):
+        if savefile is None:
+            savefile = self._model_savefile
+        savedir = os.path.dirname(savefile)
+        if not os.path.exists(savedir):
+            log("Creating directory: {}".format(savedir))
+            os.makedirs(savedir)
+        log("Saving model to: {}".format(savefile))
+        saver = tf.train.Saver()
+        saver.save(session, savefile)
+
+    def load_model(self, session, savefile):
+        saver = tf.train.Saver()
+        log("Loading model from: {}".format(savefile))
+        saver.restore(session, savefile)
+        log("Loaded model.")
 
     def train(self, session):
 
@@ -177,6 +193,7 @@ class DQN(object):
             self.print_epoch_log("TRAIN", train_scores, self.train_steps_per_epoch, train_time)
             test_start_time = time()
             test_steps = 0
+            # TESTING
             for _ in trange(self.test_episodes_per_epoch, desc="Testing, epoch {}".format(self._epoch),
                             leave=False, disable=not self.enable_progress_bar, file=sys.stdout):
                 self.doom_wrapper.reset()
@@ -213,3 +230,12 @@ class DQN(object):
             overall_time = time() - overall_start_time
             log("Total elapsed time: {}\n".format(sec_to_str(overall_time)))
             self._epoch += 1
+
+    def run_test_episode(self, session):
+        self.doom_wrapper.reset()
+        while not self.doom_wrapper.is_terminal():
+            state = self.doom_wrapper.get_current_state()
+            a = self.network.get_action(session, state)
+            self.doom_wrapper.make_action(a)
+        reward = self.doom_wrapper.get_total_reward()
+        return reward

@@ -8,6 +8,7 @@ models_path: models
 logdir: logs
 logfile: null
 tf_logdir: tensordboard_logs
+tf_log_level: 2
 tag_date_format: "%d%B%y_%H.%M"
 run_tag: null
 write_summaries: True
@@ -18,15 +19,17 @@ test_episodes_per_epoch: 100
 
 # Vizdoom wrapper options:
 resolution: [ 80, 60 ]
+vizdoom_resolution: RES_160X120
 frame_skip: 4
 stack_n_frames: 4
-use_freedoom: false
+force_freedoom: false
 display: false
 reward_scale: 1.0
 misc_scale: null
 use_misc: true
 input_n_last_actions: false
+hide_hood: false
 
 enable_progress_bar: true
-tf_log_level: 1
+
 save_interval: 1

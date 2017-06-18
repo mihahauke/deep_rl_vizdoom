@@ -11,7 +11,9 @@ SETTINGS_HELP_MSG = "load settings from yaml files. " \
 Q_HELP_MSG = "use n-step qlearning instead of a3c"
 
 
-def _add_commons(parser):
+def _create_default_parser(description):
+    parser = argparse.ArgumentParser(description=description,
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--settings", "-s",
                         dest="settings_yml",
                         metavar='YAML_FILE',
@@ -19,30 +21,79 @@ def _add_commons(parser):
                         type=str,
                         default=[DEFAULT_SETTINGS_FILE],
                         help=SETTINGS_HELP_MSG)
-    # TODO run
-    # TODO tag
-    # TODO tags extension
+    return parser
+
+
+def _create_test_parser(description):
+    parser = _create_default_parser(description=description)
+    parser.add_argument(
+                        dest="model",
+                        metavar="MODEL_FILE",
+                        type=str,
+                        help="Path to trained model."
+                        )
+    parser.add_argument("--episodes", "-e",
+                        dest="episodes_num",
+                        metavar="EPISODES_NUM",
+                        type=int,
+                        default=10,
+                        help="Number of episodes to test."
+                        )
+    parser.add_argument("--hide-window", "-ps",
+                        dest="print_settings",
+                        action="store_const",
+                        default=False,
+                        const=True,
+                        help="Hide window."
+                        )
+    parser.add_argument("--print-settings", "-hw",
+                        dest="hide_window",
+                        action="store_const",
+                        default=False,
+                        const=True,
+                        help="Print settings upon loading."
+                        )
+    parser.add_argument("-fps",
+                        dest="fps",
+                        metavar="FRAMERATE",
+                        default=35,
+                        help="If window is visible, tests will be run with given framerate."
+                        )
+    parser.add_argument("--agent-view",
+                        dest="agent_view",
+                        metavar="not_smooth",
+                        action="store_const",
+                        default=False,
+                        const=True,
+                        help="If True, window will display exactly what agent sees(with frameskip), "
+                             "not the smoothed out version."
+                        )
+    return parser
+
+
+def _add_test_commons(parser):
+    parser.add_argument()
 
 
 def parse_train_a3c_args():
-    parser = argparse.ArgumentParser(description='A3C implementation for ViZDoom in Tensorflow.',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    _add_commons(parser)
+    parser = _create_default_parser(description='A3C: training script for ViZDoom.')
 
     return parser.parse_args()
 
 
 def parse_train_adqn_args():
-    parser = argparse.ArgumentParser(description='Asynchronous n-step DQN implementation for ViZDoom in Tensorflow.',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    _add_commons(parser)
+    parser = _create_default_parser(description='Asynchronous n-step DQN: training script for ViZDoom.')
 
     return parser.parse_args()
 
 
 def parse_train_dqn_args():
-    parser = argparse.ArgumentParser(description='DQN implementation for ViZDoom in Tensorflow.',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    _add_commons(parser)
+    parser = _create_default_parser(description='DQN: training script for ViZDoom')
+
+    return parser.parse_args()
+
+
+def parse_test_dqn_args():
+    parser = _create_test_parser(description='DQN: testing script for ViZDoom')
 
     return parser.parse_args()
