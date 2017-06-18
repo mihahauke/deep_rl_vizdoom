@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import os
 
-from constants import *
-from util.parsers import parse_train_async_args
 from util.coloring import green
 from async_learner import A3CLearner, ADQNLearner
-from util.misc import print_settings, load_settings
-from util.logger import setup_file_logger, log
+from util.logger import log
 import networks
 
 
@@ -48,12 +44,14 @@ def train_async(q_learning, settings):
         for i in range(settings["threads_num"]):
             learner = ADQNLearner(thread_index=i, global_network=global_network,
                                   unfreeze_thread=i == unfreeze_thread,
-                                  global_target_network=global_target_network, optimizer=optimizer,
+                                  global_target_network=global_target_network,
+                                  optimizer=optimizer,
                                   **settings)
             learners.append(learner)
     else:
         for i in range(settings["threads_num"]):
-            learner = A3CLearner(thread_index=i, global_network=global_network, optimizer=optimizer,
+            learner = A3CLearner(thread_index=i, global_network=global_network,
+                                 optimizer=optimizer,
                                  **settings)
             learners.append(learner)
 
@@ -69,30 +67,9 @@ def train_async(q_learning, settings):
     if q_learning:
         session.run(global_network.ops.unfreeze)
 
-        log(green("Launching training."))
+    log(green("Starting training.\n"))
+
     for l in learners:
         l.run_training(session, global_steps_counter=global_steps_counter)
     for l in learners:
         l.join()
-
-
-if __name__ == "__main__":
-    args = parse_train_async_args()
-
-    if args.q:
-        default_settings_filepath = DEFAULT_ADQN_SETTINGS_FILE
-    else:
-        default_settings_filepath = DEFAULT_A3C_SETTINGS_FILE
-
-    settings = load_settings(default_settings_filepath, args.settings_yml)
-
-    if settings["logfile"] is not None:
-        log("Setting up file logging to: {}".format(settings["logfile"]))
-        setup_file_logger(settings["logfile"], add_date=True)
-
-    log("Loaded settings:")
-    print_settings(settings)
-
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(settings["tf_log_level"])
-
-    train_async(args.q, settings)

@@ -1,5 +1,6 @@
 import argparse
 
+# TODO why isn't it in constants?
 DEFAULT_SETTINGS_FILE = "settings/basic.yml"
 
 # Help messages:
@@ -23,12 +24,18 @@ def _add_commons(parser):
     # TODO tags extension
 
 
-def parse_train_async_args():
+def parse_train_a3c_args():
     parser = argparse.ArgumentParser(description='A3C implementation for ViZDoom in Tensorflow.',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     _add_commons(parser)
-    parser.add_argument("-q", action="store_const", default=False, const=True,
-                        help=Q_HELP_MSG, dest="q")
+
+    return parser.parse_args()
+
+
+def parse_train_adqn_args():
+    parser = argparse.ArgumentParser(description='Asynchronous n-step DQN implementation for ViZDoom in Tensorflow.',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    _add_commons(parser)
 
     return parser.parse_args()
 
