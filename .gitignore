@@ -93,6 +93,7 @@ tmp
 _vizdoom.ini
 models
 logs
+tensordboard_logs
 erlogs
 clear_logs.sh
 test.py
