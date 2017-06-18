@@ -4,33 +4,55 @@ import itertools as it
 import vizdoom as vzd
 import os
 import cv2
+import time
 
 
 class VizdoomWrapper(object):
     def __init__(self,
                  config_file,
-                 frame_skip,
+                 frame_skip=4,
                  display=False,
+                 async=False,
+                 smooth_display=False,
+                 fps=35,
                  resolution=(80, 60),
+                 vizdoom_resolution="RES_160X120",
                  stack_n_frames=4,
                  reward_scale=1.0,
                  noinit=False,
-                 use_freedoom=False,
+                 force_freedoom=False,
                  input_n_last_actions=False,
                  use_misc=True,
                  misc_scale=None,
+                 hide_hood=False,
                  scenarios_path=os.path.join(vzd.__path__[0], "scenarios"),
+                 seed=None,
                  **kwargs):
         doom = vzd.DoomGame()
 
-        if use_freedoom:
+        if force_freedoom:
             doom.set_doom_game_path(vzd.__path__[0] + "/freedoom2.wad")
 
         doom.load_config(os.path.join(scenarios_path, str(config_file)))
+        if hide_hood:
+            doom.set_render_hud(not hide_hood)
+
         doom.set_window_visible(display)
+        if display and smooth_display:
+            doom.add_game_args("+viz_render_all 1")
         # TODO support for colors
         doom.set_screen_format(vzd.ScreenFormat.GRAY8)
-        doom.set_screen_resolution(vzd.ScreenResolution.RES_160X120)
+        if async:
+            doom.set_mode(vzd.Mode.ASYNC_PLAYER)
+            doom.set_ticrate(int(fps))
+        else:
+            doom.set_mode(vzd.Mode.PLAYER)
+
+        if seed is not None:
+            doom.set_seed(seed)
+
+        # TODO if eval fails, show some warning
+        doom.set_screen_resolution(eval("vzd.ScreenResolution." + vizdoom_resolution))
         if not noinit:
             doom.init()
         self.doom = doom
@@ -120,7 +142,9 @@ class VizdoomWrapper(object):
         if frameskip is None:
             frameskip = self._frame_skip
         action = self._actions[action_index]
+
         reward = self.doom.make_action(action, frameskip) * self._reward_scale
+
         if not self.doom.is_episode_finished():
             if self.input_n_last_actions:
                 self.last_n_actions[0:-self.actions_num] = self.last_n_actions[self.actions_num:]
