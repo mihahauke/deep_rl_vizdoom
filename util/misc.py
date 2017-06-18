@@ -53,5 +53,5 @@ def load_settings(default_settings_file, override_settings_files):
         log("Loading settings from: " + settings_fpath)
         override_settings = yaml.safe_load(open(settings_fpath))
         settings.update(override_settings)
-
+    print("Loaded settings.")
     return settings
