@@ -1,6 +1,3 @@
-config_file: basic.cfg
-run_tag: default_basic
-
 # Convolution layers params layers:
 conv_layers: [ 32, 64, 64 ]
 conv_sizes: [ 8, 4, 3 ]
@@ -10,7 +7,10 @@ conv_strides: [ 4, 2, 1 ]
 models_path: models
 logdir: logs
 logfile: null
-tf_logdir: tf_logs
+tf_logdir: tensordboard_logs
+tag_date_format: "%d%B%y_%H.%M"
+run_tag: null
+write_summaries: True
 epochs: Inf
 
 activation_fn: tf.nn.relu
@@ -29,3 +29,4 @@ input_n_last_actions: false
 
 enable_progress_bar: true
 tf_log_level: 1
+save_interval: 1

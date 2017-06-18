@@ -1,6 +1,6 @@
 config_file: health_gathering.cfg
 scenarios_path: ../benchmark_scenarios/scenarios
-base_tag: healthg
+scenario_tag: healthgathering
 run_tag: null
 frame_skip: 10
 input_n_last_actions: 4

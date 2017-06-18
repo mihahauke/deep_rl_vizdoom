@@ -1,0 +1,3 @@
+config_file: simpler_basic.cfg
+scenario_tag: simpler_basic
+reward_scale: 0.01
