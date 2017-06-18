@@ -7,19 +7,23 @@ from time import strftime
 from vizdoom_wrapper import VizdoomWrapper
 from tqdm import trange
 from random import random, randint
+import os
 from replay_memory import ReplayMemory
 from time import time
 from util.coloring import red, green, blue
 from util import sec_to_str
 from util.logger import log
+from util.misc import setup_vector_summaries
 import sys
 import networks
 
 
 class DQN(object):
     def __init__(self,
+                 scenario_tag,
                  network_type="networks.DQNNet",
                  write_summaries=True,
+                 tf_logdir="tensorboard_logs",
                  epochs=100,
                  train_steps_per_epoch=1000000,
                  test_episodes_per_epoch=100,
@@ -34,18 +38,20 @@ class DQN(object):
                  update_pattern=(4, 4),
                  prioritized_memory=False,
                  enable_progress_bar=True,
+                 save_interval=1,
                  **settings):
 
         if prioritized_memory:
             raise NotImplementedError("Prioritized memory not implemented. Maybe some day.")
-            # TODO
+            # TODO maybe some day ...
             pass
 
         self.update_pattern = update_pattern
         self.write_summaries = write_summaries
         self._settings = settings
-        date_string = strftime("%d.%m.%y_%H-%M")
-        self._run_string = "{}/{}/{}".format(settings["base_tag"], network_type, date_string)
+        date_string = strftime(settings["tag_date_format"])
+        network_name = network_type.split(".")[-1]
+        self._run_string = "{}/{}/{}".format(scenario_tag, network_name, date_string)
         self.train_steps_per_epoch = train_steps_per_epoch
         self._run_tests = test_episodes_per_epoch > 0 and run_tests
         self.test_episodes_per_epoch = test_episodes_per_epoch
@@ -65,17 +71,18 @@ class DQN(object):
         self.batchsize = batchsize
         self.frozen_steps = frozen_steps
 
-        self._train_writer = None
-        self._test_writer = None
-        self._summaries = None
-        self._saver = None
+        self.save_interval = save_interval
 
         self._model_savefile = settings["models_path"] + "/" + self._run_string
         if self.write_summaries:
-            self.score = tf.placeholder(tf.float32)
-            score_summary = tf.summary.scalar(self._run_string + "/mean_score", self.score)
-            self._summaries = tf.summary.merge([score_summary])
-
+            self.scores_placeholder, summaries = setup_vector_summaries(scenario_tag + "/scores")
+            self._summaries = tf.summary.merge(summaries)
+            self._train_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self._run_string, "train"))
+            self._test_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self._run_string, "test"))
+        else:
+            self._train_writer = None
+            self._test_writer = None
+            self._summaries = None
         self.steps = 0
         # TODO epoch as tf variable?
         self._epoch = 1
@@ -93,7 +100,7 @@ class DQN(object):
         return np.clip(eps, self.final_epsilon, 1.0)
 
     @staticmethod
-    def print_epoch_log(self, prefix, scores, steps, epoch_time):
+    def print_epoch_log(prefix, scores, steps, epoch_time):
         mean_score = np.mean(scores)
         score_std = np.std(scores)
         min_score = np.min(scores)
@@ -115,12 +122,7 @@ class DQN(object):
                 sec_to_str(epoch_time)
             ))
 
-    def train(self):
-        # Maybe make use of the fact that it's interactive
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True
-        session = tf.InteractiveSession(config=config)
-        session.run(tf.global_variables_initializer())
+    def train(self, session):
 
         # Prefill replay memory:
         for _ in trange(self.replay_memory.capacity, desc="Filling replay memory",
@@ -136,6 +138,8 @@ class DQN(object):
 
         overall_start_time = time()
         self.network.update_target_network(session)
+
+        log(green("Starting training.\n"))
         while self._epoch <= self._epochs:
             self.doom_wrapper.reset()
             train_scores = []
@@ -185,8 +189,27 @@ class DQN(object):
                 test_scores.append(self.doom_wrapper.get_total_reward())
 
             test_time = time() - test_start_time
-            overall_time = time() - overall_start_time
 
             self.print_epoch_log("TEST", test_scores, test_steps, test_time)
+
+            if self.write_summaries:
+                log("Writing summaries.")
+                train_summary = session.run(self._summaries, {self.scores_placeholder: train_scores})
+                self._train_writer.add_summary(train_summary, self.steps)
+                if self._run_tests:
+                    test_summary = session.run(self._summaries, {self.scores_placeholder: test_scores})
+                    self._test_writer.add_summary(test_summary, self.steps)
+
+            # Save model
+            if self._epoch % self.save_interval == 0:
+                savedir = os.path.dirname(self._model_savefile)
+                if not os.path.exists(savedir):
+                    log("Creating directory: {}".format(savedir))
+                    os.makedirs(savedir)
+                log("Saving model to: {}".format(self._model_savefile))
+                saver = tf.train.Saver()
+                saver.save(session, self._model_savefile)
+
+            overall_time = time() - overall_start_time
             log("Total elapsed time: {}\n".format(sec_to_str(overall_time)))
             self._epoch += 1

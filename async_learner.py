@@ -5,7 +5,7 @@ import random
 import time
 from tqdm import trange
 from threading import Thread
-from util.coloring import red, green, blue,yellow
+from util.coloring import red, green, blue, yellow
 from time import strftime
 import tensorflow as tf
 import sys
@@ -14,6 +14,7 @@ from vizdoom import SignalException, ViZDoomUnexpectedExitException
 from util import sec_to_str, threadsafe_print
 from vizdoom_wrapper import VizdoomWrapper
 from util.logger import log
+from util.misc import setup_vector_summaries
 import networks
 import logging
 
@@ -24,28 +25,32 @@ class A3CLearner(Thread):
                  global_network,
                  optimizer,
                  network_type,
+                 scenario_tag,
+                 tf_logdir,
                  write_summaries=True,
                  enable_progress_bar=True,
+                 save_interval=1,
                  **settings):
         super(A3CLearner, self).__init__()
 
         log("Creating actor-learner #{}.".format(thread_index))
         self.thread_index = thread_index
         self.write_summaries = write_summaries
+        self.save_interval = save_interval
         self._settings = settings
         if self.write_summaries and thread_index == 0:
-            date_string = strftime("%d.%m.%y_%H-%M")
-            self._run_string = "{}/{}_{}th/{}".format(settings["base_tag"],
-                                                      network_type,
+            date_string = strftime(settings["tag_date_format"])
+            network_name = network_type.split(".")[-1]
+            self._run_string = "{}/{}_{}TH/{}".format(scenario_tag,
+                                                      network_name,
                                                       settings["threads_num"],
                                                       date_string)
-            self.tf_logdir = settings["tf_logdir"]
             self.tf_models_path = settings["models_path"]
-            if self.tf_logdir is not None:
+            if tf_logdir is not None:
                 if self._settings["run_tag"] is not None:
-                    self.tf_logdir += "/" + str(self._settings["run_tag"])
-                if not os.path.isdir(settings["tf_logdir"]):
-                    os.makedirs(settings["tf_logdir"])
+                    tf_logdir += "/" + str(self._settings["run_tag"])
+                if not os.path.isdir(tf_logdir):
+                    os.makedirs(tf_logdir)
 
             if self.tf_models_path is not None:
                 if not os.path.isdir(settings["models_path"]):
@@ -83,21 +88,20 @@ class A3CLearner(Thread):
         self._epoch = 1
         self.train_scores = []
 
+        self._model_savefile = None
         self._train_writer = None
         self._test_writer = None
         self._summaries = None
 
         if self.thread_index == 0:
-            # TODO get std, min and max - use lists instead od scalars
             self._model_savefile = settings["models_path"] + "/" + self._run_string
-            if self.write_summaries:
-                self.score = tf.placeholder(tf.float32)
-                score_summary = tf.summary.scalar(self._run_string + "/mean_score", self.score)
-                self._summaries = tf.summary.merge([score_summary])
-        else:
-            self._model_savefile = None
 
-        self._saver = None
+            if self.write_summaries:
+                self.scores_placeholder, summaries = setup_vector_summaries(scenario_tag + "/scores")
+                self._summaries = tf.summary.merge(summaries)
+                self._train_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self._run_string, "train"))
+                self._test_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self._run_string, "test"))
+
         self._session = None
         self._global_steps_counter = None
         self.enable_progress_bar = enable_progress_bar
@@ -184,6 +188,7 @@ class A3CLearner(Thread):
         return steps_performed
 
     def test(self, sess):
+        # TODO is session as an arg needed?
         test_start_time = time.time()
         test_rewards = []
         for _ in trange(self.test_episodes_per_epoch, desc="Testing", file=sys.stdout,
@@ -193,8 +198,7 @@ class A3CLearner(Thread):
                 self.local_network.reset_state()
             while not self.doom_wrapper.is_terminal():
                 current_state = self.doom_wrapper.get_current_state()
-                policy = self.local_network.get_policy(sess, current_state)
-                action_index = self.choose_action_index(policy, deterministic=True)
+                action_index = self._get_best_action(sess, current_state)
                 self.doom_wrapper.make_action(action_index)
 
             total_reward = self.doom_wrapper.get_total_reward()
@@ -216,7 +220,7 @@ class A3CLearner(Thread):
                 red("{:0.3f}".format(min_score)),
                 blue("{:0.3f}".format(max_score)),
                 sec_to_str(test_duration)))
-        return mean_score
+        return test_rewards
 
     def _print_log(self, scores, overall_start_time, last_log_time, steps):
         current_time = time.time()
@@ -261,40 +265,56 @@ class A3CLearner(Thread):
                     self._epoch += 1
 
                     if self.thread_index == 0:
+                        # TODO log learning rate
+                        log("Leargning rate: {}".format(""))
                         self._print_log(self.train_scores, overall_start_time, last_log_time, local_steps_for_log)
-                        mean_train_score = np.mean(self.train_scores)
-                        self.train_scores = []
 
-                        test_score = None
                         if self._run_tests:
-                            test_score = self.test(self._session)
+                            test_scores = self.test(self._session)
 
                         if self.write_summaries:
-                            train_summary = self._session.run(self._summaries, {self.score: mean_train_score})
+                            train_summary = self._session.run(self._summaries,
+                                                              {self.scores_placeholder: self.train_scores})
                             self._train_writer.add_summary(train_summary, global_steps)
                             if self._run_tests:
-                                test_summary = self._session.run(self._summaries, {self.score: test_score})
+                                test_summary = self._session.run(self._summaries,
+                                                                 {self.scores_placeholder: test_scores})
                                 self._test_writer.add_summary(test_summary, global_steps)
 
                         last_log_time = time.time()
                         local_steps_for_log = 0
                         log("")
 
+                        # Saves model
+                        if self._epoch % self.save_interval == 0:
+                            self.save_model()
+
+                    self.train_scores = []
+
         except (SignalException, ViZDoomUnexpectedExitException):
             threadsafe_print(red("Thread #{} aborting(ViZDoom killed).".format(self.thread_index)))
 
     def run_training(self, session, global_steps_counter):
         self._session = session
-        if self.thread_index == 0:
-            self._train_writer = tf.summary.FileWriter(self.tf_logdir + "/train")
-            if self._run_tests:
-                self._test_writer = tf.summary.FileWriter(self.tf_logdir + "/test")
-            else:
-                self._test_writer = None
-            # TODO create saver
-            self._saver = None
         self._global_steps_counter = global_steps_counter
         self.start()
+
+    def save_model(self):
+        savedir = os.path.dirname(self._model_savefile)
+        if not os.path.exists(savedir):
+            log("Creating directory: {}".format(savedir))
+            os.makedirs(savedir)
+        log("Saving model to: {}".format(self._model_savefile))
+        log("Not really saving. TODO. TF is retarded. Or it's me.")
+        # TODO
+        # TF doesnt see variables in different thread than the session was created
+        # saver = tf.train.Saver()
+        # saver.save(self._session, self._model_savefile)
+
+    def _get_best_action(self, sess, state):
+        policy = self.local_network.get_policy(sess, state)
+        action_index = self.choose_action_index(policy, deterministic=True)
+        return action_index
 
 
 class ADQNLearner(A3CLearner):
@@ -385,7 +405,7 @@ class ADQNLearner(A3CLearner):
             target_q = ri + self.gamma * target_q
             target_qs.insert(0, target_q)
 
-        # TODO delegate this to the network as train_batch(session, ...)
+        # TODO delegate this to the network as train_batch(session, ...), maybe?
         train_op_feed_dict = {
             self.local_network.vars.state_img: states_img,
             self.local_network.vars.a: actions,
@@ -402,7 +422,7 @@ class ADQNLearner(A3CLearner):
         return steps_performed
 
     def run(self):
-        # TODO this method is ugly, make it nicer
+        # TODO this method is ugly, make it nicer ...and it's the same as above.... really TODO!!
         # Basically code copied from base class with unfreezing
         try:
             overall_start_time = time.time()
@@ -420,6 +440,7 @@ class ADQNLearner(A3CLearner):
                     if global_steps >= next_target_update:
                         next_target_update += self.frozen_global_steps
                         if next_target_update <= global_steps:
+                            # TODO use warn from the logger
                             logging.warning(yellow("Global steps ({}) <= next target update ({}).".format(
                                 global_steps, next_target_update)))
 
@@ -430,59 +451,33 @@ class ADQNLearner(A3CLearner):
 
                     if self.thread_index == 0:
                         self._print_log(self.train_scores, overall_start_time, last_log_time, local_steps_for_log)
-                        mean_train_score = np.mean(self.train_scores)
-                        self.train_scores = []
 
-                        test_score = None
                         if self._run_tests:
-                            test_score = self.test(self._session)
+                            test_scores = self.test(self._session)
 
                         if self.write_summaries:
-                            train_summary = self._session.run(self._summaries, {self.score: mean_train_score})
+                            train_summary = self._session.run(self._summaries,
+                                                              {self.scores_placeholder: self.train_scores})
                             self._train_writer.add_summary(train_summary, global_steps)
                             if self._run_tests:
-                                test_summary = self._session.run(self._summaries, {self.score: test_score})
+                                test_summary = self._session.run(self._summaries,
+                                                                 {self.scores_placeholder: test_scores})
                                 self._test_writer.add_summary(test_summary, global_steps)
 
                         last_log_time = time.time()
                         local_steps_for_log = 0
                         log("")
 
+                        # Saves model
+                        if self._epoch % self.save_interval == 0:
+                            self.save_model()
+
+                    self.train_scores = []
+
         except (SignalException, ViZDoomUnexpectedExitException):
             threadsafe_print(red("Thread #{} aborting(ViZDoom killed).".format(self.thread_index)))
 
-    def test(self, sess):
-        # TODO maybe remember state for training? Should not matter so much but still...
-        test_start_time = time.time()
-        test_rewards = []
-        for _ in trange(self.test_episodes_per_epoch,  desc="Testing",
-                        leave=False, disable=not self.enable_progress_bar, file=sys.stdout):
-            self.doom_wrapper.reset()
-            if self.local_network.has_state():
-                self.local_network.reset_state()
-            while not self.doom_wrapper.is_terminal():
-                current_state = self.doom_wrapper.get_current_state()
-                q = self.local_network.get_q_values(sess, current_state).flatten()
-                action_index = q.argmax()
-                self.doom_wrapper.make_action(action_index)
-
-            total_reward = self.doom_wrapper.get_total_reward()
-            test_rewards.append(total_reward)
-
-        self.doom_wrapper.reset()
-        if self.local_network.has_state():
-            self.local_network.reset_state()
-
-        test_end_time = time.time()
-        test_duration = test_end_time - test_start_time
-        min_score = np.min(test_rewards)
-        max_score = np.max(test_rewards)
-        mean_score = np.mean(test_rewards)
-        score_std = np.std(test_rewards)
-        log(
-            "TEST: mean: {}, min: {}, max: {}, test time: {}".format(
-                green("{:0.3f}±{:0.2f}".format(mean_score, score_std)),
-                red("{:0.3f}".format(min_score)),
-                blue("{:0.3f}".format(max_score)),
-                sec_to_str(test_duration)))
-        return mean_score
+    def _get_best_action(self, sess, state):
+        q = self.local_network.get_q_values(sess, state).flatten()
+        action_index = q.argmax()
+        return action_index
