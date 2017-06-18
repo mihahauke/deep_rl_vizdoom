@@ -1,6 +1,7 @@
 import tensorflow as tf
 from tensorflow.python.training.optimizer import Optimizer
 
+
 # TODO separate class is superfluous, just clip the gradients where they are produces ....
 class ClippingRMSPropOptimizer(tf.train.RMSPropOptimizer):
     def __init__(self,
@@ -25,7 +26,6 @@ class ClippingRMSPropOptimizer(tf.train.RMSPropOptimizer):
                           aggregation_method=None,
                           colocate_gradients_with_ops=False,
                           grad_loss=None):
-
         grads_and_vars = super(ClippingRMSPropOptimizer, self).compute_gradients(loss, var_list=var_list,
                                                                                  gate_gradients=gate_gradients,
                                                                                  aggregation_method=aggregation_method,
