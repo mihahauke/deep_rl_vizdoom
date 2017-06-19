@@ -24,6 +24,7 @@ class A3CLearner(Thread):
                  thread_index,
                  global_network,
                  optimizer,
+                 learning_rate,
                  network_type,
                  scenario_tag,
                  tf_logdir,
@@ -73,6 +74,7 @@ class A3CLearner(Thread):
         self.local_network = eval(network_type)(actions_num=self.actions_num, img_shape=img_shape, misc_len=misc_len,
                                                 thread=thread_index, **settings)
 
+        self.learning_rate = learning_rate
         # TODO check gate_gradients != Optimizer.GATE_OP
         grads_and_vars = optimizer.compute_gradients(self.local_network.ops.loss,
                                                      var_list=self.local_network.get_params())
@@ -265,8 +267,6 @@ class A3CLearner(Thread):
                     self._epoch += 1
 
                     if self.thread_index == 0:
-                        # TODO log learning rate
-                        log("Leargning rate: {}".format(""))
                         self._print_log(self.train_scores, overall_start_time, last_log_time, local_steps_for_log)
 
                         if self._run_tests:
@@ -283,12 +283,12 @@ class A3CLearner(Thread):
 
                         last_log_time = time.time()
                         local_steps_for_log = 0
-                        log("")
+                        log("Leargning rate: {}".format(self._session.run(self.learning_rate)))
 
                         # Saves model
                         if self._epoch % self.save_interval == 0:
                             self.save_model()
-
+                        log("")
                     self.train_scores = []
 
         except (SignalException, ViZDoomUnexpectedExitException):
@@ -297,6 +297,10 @@ class A3CLearner(Thread):
     def run_training(self, session, global_steps_counter):
         self._session = session
         self._global_steps_counter = global_steps_counter
+        vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
+        for v in vars:
+            print(v)
+        exit(0)
         self.start()
 
     def save_model(self):
@@ -466,6 +470,8 @@ class ADQNLearner(A3CLearner):
 
                         last_log_time = time.time()
                         local_steps_for_log = 0
+
+                        log("Leargning rate: {}".format(self._session.run(self.learning_rate)))
                         log("")
 
                         # Saves model

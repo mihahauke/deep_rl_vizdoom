@@ -46,12 +46,13 @@ def train_async(q_learning, settings):
                                   unfreeze_thread=i == unfreeze_thread,
                                   global_target_network=global_target_network,
                                   optimizer=optimizer,
+                                  learning_rate=global_learning_rate,
                                   **settings)
             learners.append(learner)
     else:
         for i in range(settings["threads_num"]):
             learner = A3CLearner(thread_index=i, global_network=global_network,
-                                 optimizer=optimizer,
+                                 optimizer=optimizer, learning_rate=global_learning_rate,
                                  **settings)
             learners.append(learner)
 
