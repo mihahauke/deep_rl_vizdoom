@@ -22,24 +22,47 @@ import logging
 class A3CLearner(Thread):
     def __init__(self,
                  thread_index,
-                 global_network,
-                 optimizer,
-                 learning_rate,
                  network_type,
-                 scenario_tag,
-                 tf_logdir,
+                 session=None,
+                 scenario_tag=None,
+                 tf_logdir=None,
+                 global_network=None,
+                 optimizer=None,
+                 learning_rate=None,
+                 test_only=False,
                  write_summaries=True,
                  enable_progress_bar=True,
+                 deterministic_testing=True,
                  save_interval=1,
                  **settings):
         super(A3CLearner, self).__init__()
 
         log("Creating actor-learner #{}.".format(thread_index))
         self.thread_index = thread_index
+
         self.write_summaries = write_summaries
         self.save_interval = save_interval
-        self._settings = settings
-        if self.write_summaries and thread_index == 0:
+        self.enable_progress_bar = enable_progress_bar
+        self._model_savefile = None
+        self._train_writer = None
+        self._test_writer = None
+        self._summaries = None
+        self._session = session
+        self._global_steps_counter = None
+        self.deterministic_testing = deterministic_testing
+        self.local_steps = 0
+        # TODO epoch as tf variable?
+        self._epoch = 1
+        self.train_scores = []
+
+        self.local_steps_per_epoch = settings["local_steps_per_epoch"]
+        self._run_tests = settings["test_episodes_per_epoch"] > 0 and settings["run_tests"]
+        self.test_episodes_per_epoch = settings["test_episodes_per_epoch"]
+        self._epochs = np.float32(settings["epochs"])
+        self.max_remembered_steps = settings["max_remembered_steps"]
+        self.gamma = np.float32(settings["gamma"])
+
+        if self.write_summaries and thread_index == 0 and not test_only:
             date_string = strftime(settings["tag_date_format"])
             network_name = network_type.split(".")[-1]
             self._run_string = "{}/{}_{}TH/{}".format(scenario_tag,
@@ -48,21 +71,14 @@ class A3CLearner(Thread):
                                                       date_string)
             self.tf_models_path = settings["models_path"]
             if tf_logdir is not None:
-                if self._settings["run_tag"] is not None:
-                    tf_logdir += "/" + str(self._settings["run_tag"])
+                if settings["run_tag"] is not None:
+                    tf_logdir += "/" + str(settings["run_tag"])
                 if not os.path.isdir(tf_logdir):
                     os.makedirs(tf_logdir)
 
             if self.tf_models_path is not None:
                 if not os.path.isdir(settings["models_path"]):
                     os.makedirs(settings["models_path"])
-
-        self.local_steps_per_epoch = settings["local_steps_per_epoch"]
-        self._run_tests = settings["test_episodes_per_epoch"] > 0 and settings["run_tests"]
-        self.test_episodes_per_epoch = settings["test_episodes_per_epoch"]
-        self._epochs = np.float32(settings["epochs"])
-        self.max_remembered_steps = settings["max_remembered_steps"]
-        self.gamma = np.float32(settings["gamma"])
 
         self.doom_wrapper = VizdoomWrapper(**settings)
         misc_len = self.doom_wrapper.misc_len
@@ -74,28 +90,21 @@ class A3CLearner(Thread):
         self.local_network = eval(network_type)(actions_num=self.actions_num, img_shape=img_shape, misc_len=misc_len,
                                                 thread=thread_index, **settings)
 
-        self.learning_rate = learning_rate
-        # TODO check gate_gradients != Optimizer.GATE_OP
-        grads_and_vars = optimizer.compute_gradients(self.local_network.ops.loss,
-                                                     var_list=self.local_network.get_params())
-        grads, local_vars = zip(*grads_and_vars)
+        if not test_only:
+            self.learning_rate = learning_rate
+            # TODO check gate_gradients != Optimizer.GATE_OP
+            grads_and_vars = optimizer.compute_gradients(self.local_network.ops.loss,
+                                                         var_list=self.local_network.get_params())
+            grads, local_vars = zip(*grads_and_vars)
 
-        grads_and_global_vars = zip(grads, global_network.get_params())
+            grads_and_global_vars = zip(grads, global_network.get_params())
 
-        self.train_op = optimizer.apply_gradients(grads_and_global_vars, global_step=tf.train.get_global_step())
-        self.local_network.prepare_sync_op(global_network)
-        self.global_network = global_network
-        self.local_steps = 0
-        # TODO epoch as tf variable?
-        self._epoch = 1
-        self.train_scores = []
+            self.train_op = optimizer.apply_gradients(grads_and_global_vars, global_step=tf.train.get_global_step())
 
-        self._model_savefile = None
-        self._train_writer = None
-        self._test_writer = None
-        self._summaries = None
+            self.global_network = global_network
+            self.local_network.prepare_sync_op(global_network)
 
-        if self.thread_index == 0:
+        if self.thread_index == 0 and not test_only:
             self._model_savefile = settings["models_path"] + "/" + self._run_string
 
             if self.write_summaries:
@@ -103,10 +112,6 @@ class A3CLearner(Thread):
                 self._summaries = tf.summary.merge(summaries)
                 self._train_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self._run_string, "train"))
                 self._test_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self._run_string, "test"))
-
-        self._session = None
-        self._global_steps_counter = None
-        self.enable_progress_bar = enable_progress_bar
 
     @staticmethod
     def choose_action_index(policy, deterministic=False):
@@ -189,21 +194,27 @@ class A3CLearner(Thread):
 
         return steps_performed
 
-    def test(self, sess):
-        # TODO is session as an arg needed?
+    def run_episode(self, deterministic=True):
+        self.doom_wrapper.reset()
+        if self.local_network.has_state():
+            self.local_network.reset_state()
+        while not self.doom_wrapper.is_terminal():
+            current_state = self.doom_wrapper.get_current_state()
+            action_index = self._get_best_action(self._session, current_state, deterministic=deterministic)
+            self.doom_wrapper.make_action(action_index)
+
+        total_reward = self.doom_wrapper.get_total_reward()
+        return total_reward
+
+    def test(self, episodes_num=None, deterministic=True):
+        if episodes_num is None:
+            episodes_num = self.test_episodes_per_epoch
+
         test_start_time = time.time()
         test_rewards = []
-        for _ in trange(self.test_episodes_per_epoch, desc="Testing", file=sys.stdout,
+        for _ in trange(episodes_num, desc="Testing", file=sys.stdout,
                         leave=False, disable=not self.enable_progress_bar):
-            self.doom_wrapper.reset()
-            if self.local_network.has_state():
-                self.local_network.reset_state()
-            while not self.doom_wrapper.is_terminal():
-                current_state = self.doom_wrapper.get_current_state()
-                action_index = self._get_best_action(sess, current_state)
-                self.doom_wrapper.make_action(action_index)
-
-            total_reward = self.doom_wrapper.get_total_reward()
+            total_reward = self.run_episode(deterministic=self.deterministic_testing)
             test_rewards.append(total_reward)
 
         self.doom_wrapper.reset()
@@ -224,7 +235,7 @@ class A3CLearner(Thread):
                 sec_to_str(test_duration)))
         return test_rewards
 
-    def _print_log(self, scores, overall_start_time, last_log_time, steps):
+    def _print_train_log(self, scores, overall_start_time, last_log_time, steps):
         current_time = time.time()
         mean_score = np.mean(scores)
         score_std = np.std(scores)
@@ -267,10 +278,10 @@ class A3CLearner(Thread):
                     self._epoch += 1
 
                     if self.thread_index == 0:
-                        self._print_log(self.train_scores, overall_start_time, last_log_time, local_steps_for_log)
+                        self._print_train_log(self.train_scores, overall_start_time, last_log_time, local_steps_for_log)
 
                         if self._run_tests:
-                            test_scores = self.test(self._session)
+                            test_scores = self.test(deterministic=self.deterministic_testing)
 
                         if self.write_summaries:
                             train_summary = self._session.run(self._summaries,
@@ -297,10 +308,6 @@ class A3CLearner(Thread):
     def run_training(self, session, global_steps_counter):
         self._session = session
         self._global_steps_counter = global_steps_counter
-        vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
-        for v in vars:
-            print(v)
-        exit(0)
         self.start()
 
     def save_model(self):
@@ -309,21 +316,24 @@ class A3CLearner(Thread):
             log("Creating directory: {}".format(savedir))
             os.makedirs(savedir)
         log("Saving model to: {}".format(self._model_savefile))
-        log("Not really saving. TODO. TF is retarded. Or it's me.")
-        # TODO
-        # TF doesnt see variables in different thread than the session was created
-        # saver = tf.train.Saver()
-        # saver.save(self._session, self._model_savefile)
+        saver = tf.train.Saver(self.local_network.get_params())
+        saver.save(self._session, self._model_savefile)
 
-    def _get_best_action(self, sess, state):
+    def load_model(self, session, savefile):
+        saver = tf.train.Saver(self.local_network.get_params())
+        log("Loading model from: {}".format(savefile))
+        saver.restore(session, savefile)
+        log("Loaded model.")
+
+    def _get_best_action(self, sess, state, deterministic=True):
         policy = self.local_network.get_policy(sess, state)
-        action_index = self.choose_action_index(policy, deterministic=True)
+        action_index = self.choose_action_index(policy, deterministic=deterministic)
         return action_index
 
 
 class ADQNLearner(A3CLearner):
     def __init__(self,
-                 global_target_network,
+                 global_target_network=None,
                  unfreeze_thread=False,
                  frozen_global_steps=40000,
                  initial_epsilon=1.0,
@@ -339,8 +349,8 @@ class ADQNLearner(A3CLearner):
         else:
             self.frozen_global_steps = None
 
-        # Epsilon
-        # TODO randomize epsilon somehow
+            # Epsilon
+            # TODO randomize epsilon somehow
         self.epsilon_decay_rate = (initial_epsilon - final_epsilon) / epsilon_decay_steps
         self.epsilon_decay_start_step = epsilon_decay_start_step
         self.initial_epsilon = initial_epsilon
@@ -454,10 +464,10 @@ class ADQNLearner(A3CLearner):
                     self._epoch += 1
 
                     if self.thread_index == 0:
-                        self._print_log(self.train_scores, overall_start_time, last_log_time, local_steps_for_log)
+                        self._print_train_log(self.train_scores, overall_start_time, last_log_time, local_steps_for_log)
 
                         if self._run_tests:
-                            test_scores = self.test(self._session)
+                            test_scores = self.test(deterministic=self.deterministic_testing)
 
                         if self.write_summaries:
                             train_summary = self._session.run(self._summaries,
@@ -472,18 +482,19 @@ class ADQNLearner(A3CLearner):
                         local_steps_for_log = 0
 
                         log("Leargning rate: {}".format(self._session.run(self.learning_rate)))
-                        log("")
 
                         # Saves model
                         if self._epoch % self.save_interval == 0:
                             self.save_model()
+
+                        log("")
 
                     self.train_scores = []
 
         except (SignalException, ViZDoomUnexpectedExitException):
             threadsafe_print(red("Thread #{} aborting(ViZDoom killed).".format(self.thread_index)))
 
-    def _get_best_action(self, sess, state):
+    def _get_best_action(self, sess, state, deterministic=True):
         q = self.local_network.get_q_values(sess, state).flatten()
         action_index = q.argmax()
         return action_index

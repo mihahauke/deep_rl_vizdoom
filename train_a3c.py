@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from train_async import train_async
+from async import train_async
 
 from paths import DEFAULT_A3C_SETTINGS_FILE
 from util.parsers import parse_train_a3c_args

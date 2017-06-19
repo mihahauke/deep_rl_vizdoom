@@ -17,7 +17,7 @@ if __name__ == "__main__":
     print(args)
     settings = load_settings(DEFAULT_DQN_SETTINGS_FILE, args.settings_yml)
 
-    log("Loaded settings:")
+    log("Loaded settings.")
     if args.print_settings:
         print_settings(settings)
 
@@ -27,6 +27,7 @@ if __name__ == "__main__":
     settings["async"] = not args.hide_window
     settings["smooth_display"] = not args.agent_view
     settings["fps"] = args.fps
+    settings["seed"] = args.seed
 
     dqn = DQN(**settings)
 

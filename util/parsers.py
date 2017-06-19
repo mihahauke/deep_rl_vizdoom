@@ -61,12 +61,18 @@ def _create_test_parser(description):
                         )
     parser.add_argument("--agent-view",
                         dest="agent_view",
-                        metavar="not_smooth",
                         action="store_const",
                         default=False,
                         const=True,
                         help="If True, window will display exactly what agent sees(with frameskip), "
                              "not the smoothed out version."
+                        )
+    parser.add_argument("--seed",
+                        dest="seed",
+                        metavar="SEED",
+                        default=None,
+                        type=int,
+                        help="Seed for ViZDoom."
                         )
     return parser
 
@@ -95,5 +101,10 @@ def parse_train_dqn_args():
 
 def parse_test_dqn_args():
     parser = _create_test_parser(description='DQN: testing script for ViZDoom')
+
+    return parser.parse_args()
+
+def parse_test_adqn_args():
+    parser = _create_test_parser(description='Asynchronous n-step DQN: testing script for ViZDoom')
 
     return parser.parse_args()

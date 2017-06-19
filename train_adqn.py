@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from train_async import train_async
+from async import train_async
 
 from paths import DEFAULT_ADQN_SETTINGS_FILE
 from util.parsers import parse_train_adqn_args

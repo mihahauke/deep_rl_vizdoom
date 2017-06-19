@@ -4,21 +4,20 @@
 from util.coloring import green
 from async_learner import A3CLearner, ADQNLearner
 from util.logger import log
+from vizdoom_wrapper import VizdoomWrapper
+from util import ThreadsafeCounter
+from util.optimizers import ClippingRMSPropOptimizer
 import networks
+import tensorflow as tf
+import numpy as np
 
 
 def train_async(q_learning, settings):
-    import tensorflow as tf
-
-    from vizdoom_wrapper import VizdoomWrapper
-    from util import ThreadsafeCounter
-    from util.optimizers import ClippingRMSPropOptimizer
-
-    tmp_vizdoom_wrapper = VizdoomWrapper(noinit=True, **settings)
-    actions_num = tmp_vizdoom_wrapper.actions_num
-    misc_len = tmp_vizdoom_wrapper.misc_len
-    img_shape = tmp_vizdoom_wrapper.img_shape
-    del tmp_vizdoom_wrapper
+    proto_vizdoom = VizdoomWrapper(noinit=True, **settings)
+    actions_num = proto_vizdoom.actions_num
+    misc_len = proto_vizdoom.misc_len
+    img_shape = proto_vizdoom.img_shape
+    del proto_vizdoom
 
     # TODO target global network
     # This global step counts gradient applications not performed actions.
@@ -74,3 +73,30 @@ def train_async(q_learning, settings):
         l.run_training(session, global_steps_counter=global_steps_counter)
     for l in learners:
         l.join()
+
+
+def test_async(q_learning, settings, modelfile, eps, ):
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    session = tf.InteractiveSession(config=config)
+
+    if q_learning:
+        agent = ADQNLearner(thread_index=0, session=session, **settings)
+    else:
+        agent = A3CLearner(thread_index=0, session=session, **settings)
+
+    log("Initializing variables...")
+    session.run(tf.global_variables_initializer())
+    log("Initialization finished.\n")
+
+    agent.load_model(session, modelfile)
+
+    log("\nScores: ")
+    scores = []
+
+    for _ in range(eps):
+        reward = agent.run_episode(deterministic=True)
+        scores.append(reward)
+        print("{0:3f}".format(reward))
+    print()
+    log("\nMean score: {:0.3f}".format(np.mean(scores)))

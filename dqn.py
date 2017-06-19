@@ -72,7 +72,7 @@ class DQN(object):
 
         self.save_interval = save_interval
 
-        self._model_savefile = settings["models_path"] + "/" + self._run_string + ".ckpt"
+        self._model_savefile = settings["models_path"] + "/" + self._run_string
         if self.write_summaries:
             self.scores_placeholder, summaries = setup_vector_summaries(scenario_tag + "/scores")
             self._summaries = tf.summary.merge(summaries)
