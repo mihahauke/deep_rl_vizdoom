@@ -7,7 +7,7 @@ conv_strides: [ 4, 2, 1 ]
 models_path: models
 logdir: logs
 logfile: null
-tf_logdir: tensordboard_logs
+tf_logdir: tensorboard_logs
 tf_log_level: 2
 tag_date_format: "%d%B%y_%H.%M"
 run_tag: null
