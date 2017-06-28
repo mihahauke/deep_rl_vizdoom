@@ -39,6 +39,8 @@ class DQN(object):
                  prioritized_memory=False,
                  enable_progress_bar=True,
                  save_interval=1,
+                 writer_max_queue=10,
+                 writer_flush_secs=120,
                  **settings):
 
         if prioritized_memory:
@@ -76,8 +78,10 @@ class DQN(object):
         if self.write_summaries:
             self.scores_placeholder, summaries = setup_vector_summaries(scenario_tag + "/scores")
             self._summaries = tf.summary.merge(summaries)
-            self._train_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self._run_string, "train"))
-            self._test_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self._run_string, "test"))
+            self._train_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self._run_string, "train"),
+                                                           flush_secs=writer_flush_secs,max_queue=writer_max_queue)
+            self._test_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self._run_string, "test"),
+                                                           flush_secs=writer_flush_secs,max_queue=writer_max_queue)
         else:
             self._train_writer = None
             self._test_writer = None

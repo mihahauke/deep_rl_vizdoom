@@ -4,14 +4,14 @@
 from async import test_async
 
 from paths import DEFAULT_ADQN_SETTINGS_FILE
-from util.parsers import parse_test_adqn_args
+from util.parsers import parse_test_a3c_args
 import os
 
 from util.misc import print_settings, load_settings
 from util.logger import setup_file_logger, log
 
 if __name__ == "__main__":
-    args = parse_test_adqn_args()
+    args = parse_test_a3c_args()
 
     settings = load_settings(DEFAULT_ADQN_SETTINGS_FILE, args.settings_yml)
 
@@ -30,5 +30,4 @@ if __name__ == "__main__":
     settings["test_only"] = True
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(settings["tf_log_level"])
-
-    test_async(q_learning=True, settings=settings, modelfile=args.model, eps=args.episodes_num)
+    test_async(q_learning=False, settings=settings, modelfile=args.model, eps=args.episodes_num)

@@ -75,7 +75,7 @@ def train_async(q_learning, settings):
         l.join()
 
 
-def test_async(q_learning, settings, modelfile, eps, ):
+def test_async(q_learning, settings, modelfile, eps, deterministic=True):
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     session = tf.InteractiveSession(config=config)
@@ -95,7 +95,7 @@ def test_async(q_learning, settings, modelfile, eps, ):
     scores = []
 
     for _ in range(eps):
-        reward = agent.run_episode(deterministic=True)
+        reward = agent.run_episode(deterministic=deterministic)
         scores.append(reward)
         print("{0:3f}".format(reward))
     print()

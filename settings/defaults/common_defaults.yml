@@ -33,3 +33,5 @@ hide_hood: false
 enable_progress_bar: true
 
 save_interval: 1
+writer_max_queue: 10
+writer_flush_secs: 120

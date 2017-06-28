@@ -60,6 +60,7 @@ def _create_test_parser(description):
                         help="If window is visible, tests will be run with given framerate."
                         )
     parser.add_argument("--agent-view",
+                        "-aw",
                         dest="agent_view",
                         action="store_const",
                         default=False,
@@ -106,5 +107,10 @@ def parse_test_dqn_args():
 
 def parse_test_adqn_args():
     parser = _create_test_parser(description='Asynchronous n-step DQN: testing script for ViZDoom')
+
+    return parser.parse_args()
+
+def parse_test_a3c_args():
+    parser = _create_test_parser(description='A3C: testing script for ViZDoom')
 
     return parser.parse_args()

@@ -34,6 +34,8 @@ class A3CLearner(Thread):
                  enable_progress_bar=True,
                  deterministic_testing=True,
                  save_interval=1,
+                 writer_max_queue=10,
+                 writer_flush_secs=120,
                  **settings):
         super(A3CLearner, self).__init__()
 
@@ -86,7 +88,7 @@ class A3CLearner(Thread):
         self.use_misc = self.doom_wrapper.use_misc
 
         self.actions_num = self.doom_wrapper.actions_num
-
+        # TODO add debug log
         self.local_network = eval(network_type)(actions_num=self.actions_num, img_shape=img_shape, misc_len=misc_len,
                                                 thread=thread_index, **settings)
 
@@ -110,8 +112,10 @@ class A3CLearner(Thread):
             if self.write_summaries:
                 self.scores_placeholder, summaries = setup_vector_summaries(scenario_tag + "/scores")
                 self._summaries = tf.summary.merge(summaries)
-                self._train_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self._run_string, "train"))
-                self._test_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self._run_string, "test"))
+                self._train_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self._run_string, "train"),
+                                                           flush_secs=writer_flush_secs, max_queue=writer_max_queue)
+                self._test_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self._run_string, "test"),
+                                                          flush_secs=writer_flush_secs, max_queue=writer_max_queue)
 
     @staticmethod
     def choose_action_index(policy, deterministic=False):

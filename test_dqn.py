@@ -28,6 +28,8 @@ if __name__ == "__main__":
     settings["smooth_display"] = not args.agent_view
     settings["fps"] = args.fps
     settings["seed"] = args.seed
+    settings["write_summaries"] = False
+    settings["test_only"] = True
 
     dqn = DQN(**settings)
 
