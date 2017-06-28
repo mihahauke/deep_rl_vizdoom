@@ -66,10 +66,10 @@ class _BaseACNet(_BaseNetwork):
         entropy = -tf.reduce_sum(self.ops.pi * log_pi)
         chosen_pi_log = gather_2d(log_pi, self.vars.a)
 
-        policy_loss = - tf.reduce_sum(chosen_pi_log * self.vars.advantage) + entropy * self._entropy_beta
+        policy_loss = - tf.reduce_sum(chosen_pi_log * self.vars.advantage)
         value_loss = 0.5 * tf.reduce_sum(tf.squared_difference(self.vars.R, self.ops.v))
 
-        self.ops.loss = policy_loss + value_loss
+        self.ops.loss = policy_loss + value_loss - entropy * self._entropy_beta
 
     def create_architecture(self, **specs):
         raise NotImplementedError()
