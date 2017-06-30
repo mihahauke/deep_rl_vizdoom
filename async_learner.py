@@ -234,7 +234,7 @@ class A3CLearner(Thread):
         mean_score = np.mean(test_rewards)
         score_std = np.std(test_rewards)
         log(
-            "TEST: mean: {}, min: {}, max: {} ,test time: {}".format(
+            "TEST: mean: {}, min: {}, max: {}, test time: {}".format(
                 green("{:0.3f}±{:0.2f}".format(mean_score, score_std)),
                 red("{:0.3f}".format(min_score)),
                 blue("{:0.3f}".format(max_score)),
@@ -254,7 +254,7 @@ class A3CLearner(Thread):
         global_steps_per_sec = global_steps / elapsed_time
         global_mil_steps_per_hour = global_steps_per_sec * 3600 / 1000000.0
         log(
-            "TRAIN: {}(GlobalSteps) ,mean: {}, min: {}, max: {}, "
+            "TRAIN: {}(GlobalSteps), mean: {}, min: {}, max: {}, "
             " LocalSpd: {:.0f} STEPS/s GlobalSpd: "
             "{} STEPS/s, {:.2f}M STEPS/hour, total elapsed time: {}".format(
                 global_steps,

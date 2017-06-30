@@ -4,8 +4,8 @@ import os
 
 import tensorflow as tf
 from util.parsers import parse_train_dqn_args
-from util.logger import log,setup_file_logger
-from util.misc import load_settings,print_settings
+from util.logger import log, setup_file_logger
+from util.misc import load_settings, print_settings
 from dqn import DQN
 from paths import *
 
@@ -14,7 +14,8 @@ if __name__ == "__main__":
     args = parse_train_dqn_args()
     settings = load_settings(DEFAULT_DQN_SETTINGS_FILE, args.settings_yml)
 
-    setup_file_logger(settings["logfile"], add_date=True)
+    if settings["logfile"] is not None:
+        setup_file_logger(settings["logfile"], add_date=True)
 
     log("Settings:")
     print_settings(settings)

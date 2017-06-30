@@ -16,7 +16,6 @@ if __name__ == "__main__":
     settings = load_settings(DEFAULT_ADQN_SETTINGS_FILE, args.settings_yml)
 
     if settings["logfile"] is not None:
-        log("Setting up file logging to: {}".format(settings["logfile"]))
         setup_file_logger(settings["logfile"], add_date=True)
 
     log("Settings:")
