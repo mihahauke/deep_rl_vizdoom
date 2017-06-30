@@ -8,7 +8,7 @@ from util.parsers import parse_test_a3c_args
 import os
 
 from util.misc import print_settings, load_settings
-from util.logger import setup_file_logger, log
+from util.logger import log
 
 if __name__ == "__main__":
     args = parse_test_a3c_args()
