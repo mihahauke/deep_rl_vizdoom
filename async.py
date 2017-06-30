@@ -23,6 +23,7 @@ def train_async(q_learning, settings):
     # This global step counts gradient applications not performed actions.
     global_train_step = tf.Variable(0, trainable=False, name="global_step")
     global_learning_rate = tf.train.polynomial_decay(
+        name="larning_rate",
         learning_rate=settings["initial_learning_rate"],
         end_learning_rate=settings["final_learning_rate"],
         decay_steps=settings["learning_rate_decay_steps"],
@@ -34,6 +35,8 @@ def train_async(q_learning, settings):
 
     global_network = network_class(actions_num=actions_num, misc_len=misc_len, img_shape=img_shape,
                                    **settings)
+
+    global_steps_counter = ThreadsafeCounter()
     if q_learning:
         global_target_network = network_class(thread="global_target", actions_num=actions_num,
                                               misc_len=misc_len,
@@ -46,12 +49,14 @@ def train_async(q_learning, settings):
                                   global_target_network=global_target_network,
                                   optimizer=optimizer,
                                   learning_rate=global_learning_rate,
+                                  global_steps_counter=global_steps_counter,
                                   **settings)
             learners.append(learner)
     else:
         for i in range(settings["threads_num"]):
             learner = A3CLearner(thread_index=i, global_network=global_network,
                                  optimizer=optimizer, learning_rate=global_learning_rate,
+                                 global_steps_counter=global_steps_counter,
                                  **settings)
             learners.append(learner)
 
@@ -62,7 +67,6 @@ def train_async(q_learning, settings):
     log("Initializing variables...")
     session.run(tf.global_variables_initializer())
     log("Initialization finished.\n")
-    global_steps_counter = ThreadsafeCounter()
 
     if q_learning:
         session.run(global_network.ops.unfreeze)
@@ -70,7 +74,7 @@ def train_async(q_learning, settings):
     log(green("Starting training.\n"))
 
     for l in learners:
-        l.run_training(session, global_steps_counter=global_steps_counter)
+        l.run_training(session)
     for l in learners:
         l.join()
 

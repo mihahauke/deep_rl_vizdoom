@@ -23,6 +23,7 @@ class A3CLearner(Thread):
     def __init__(self,
                  thread_index,
                  network_type,
+                 global_steps_counter,
                  session=None,
                  scenario_tag=None,
                  tf_logdir=None,
@@ -42,6 +43,7 @@ class A3CLearner(Thread):
         log("Creating actor-learner #{}.".format(thread_index))
         self.thread_index = thread_index
 
+        self._global_steps_counter = global_steps_counter
         self.write_summaries = write_summaries
         self.save_interval = save_interval
         self.enable_progress_bar = enable_progress_bar
@@ -50,7 +52,6 @@ class A3CLearner(Thread):
         self._test_writer = None
         self._summaries = None
         self._session = session
-        self._global_steps_counter = None
         self.deterministic_testing = deterministic_testing
         self.local_steps = 0
         # TODO epoch as tf variable?
@@ -100,7 +101,6 @@ class A3CLearner(Thread):
             grads, local_vars = zip(*grads_and_vars)
 
             grads_and_global_vars = zip(grads, global_network.get_params())
-
             self.train_op = optimizer.apply_gradients(grads_and_global_vars, global_step=tf.train.get_global_step())
 
             self.global_network = global_network
@@ -111,6 +111,8 @@ class A3CLearner(Thread):
 
             if self.write_summaries:
                 self.scores_placeholder, summaries = setup_vector_summaries(scenario_tag + "/scores")
+                lr_summary = tf.summary.scalar(scenario_tag + "/learning_rate", self.learning_rate)
+                summaries.append(lr_summary)
                 self._summaries = tf.summary.merge(summaries)
                 self._train_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self._run_string, "train"),
                                                            flush_secs=writer_flush_secs, max_queue=writer_max_queue)
@@ -276,7 +278,6 @@ class A3CLearner(Thread):
                 steps = self.make_training_step()
                 local_steps_for_log += steps
                 global_steps = self._global_steps_counter.inc(steps)
-
                 # Logs & tests
                 if self.local_steps_per_epoch * self._epoch <= self.local_steps:
                     self._epoch += 1
@@ -309,9 +310,8 @@ class A3CLearner(Thread):
         except (SignalException, ViZDoomUnexpectedExitException):
             threadsafe_print(red("Thread #{} aborting(ViZDoom killed).".format(self.thread_index)))
 
-    def run_training(self, session, global_steps_counter):
+    def run_training(self, session):
         self._session = session
-        self._global_steps_counter = global_steps_counter
         self.start()
 
     def save_model(self):
