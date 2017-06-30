@@ -1,4 +1,5 @@
 threads_num: 16
+#epochs: ??
 
 network_type: networks.ACLstmNet
 recurrent_units_num: 256
@@ -8,13 +9,16 @@ fc_units_num: 256
 local_steps_per_epoch: 50000
 run_tests: true
 
-max_remembered_steps: 5
-initial_learning_rate: 0.0007
-final_learning_rate: 0.00001
-learning_rate_decay_steps: 10e07
-gamma: 0.99
-entropy_beta: 0.01
+max_remembered_steps: 20
 
+initial_learning_rate: 0.00008
+final_learning_rate: 0.00001
+learning_rate_decay_steps: 10e06
+gamma: 0.99
+
+initial_entropy_beta: 0.05
+final_entropy_beta: 0.0
+learning_rate_decay_steps: 10e06
 # RMSProp
 rmsprop:
   decay: 0.99

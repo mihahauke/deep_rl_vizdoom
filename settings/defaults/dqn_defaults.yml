@@ -1,6 +1,7 @@
 # Network
 network_type: networks.DuelingDQNNet
 fc_units_num: 256
+#epochs: ??
 
 double: true
 prioritized_memory: false

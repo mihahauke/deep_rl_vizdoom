@@ -16,7 +16,9 @@ class _BaseACNet(_BaseNetwork):
     def __init__(self,
                  img_shape,
                  misc_len=0,
-                 entropy_beta=0.01,
+                 initial_entropy_beta=0.05,
+                 final_entropy_beta=0.0,
+                 entropy_beta_decay_steps=10e6,
                  thread="global",
                  **settings):
 
@@ -32,11 +34,19 @@ class _BaseACNet(_BaseNetwork):
         self._name_scope = self._get_name_scope() + "_" + str(thread)
 
         self._params = None
-        self._entropy_beta = entropy_beta
+
+        if initial_entropy_beta == final_entropy_beta:
+            self._entropy_beta = initial_entropy_beta
+        else:
+            self._entropy_beta = tf.train.polynomial_decay(
+                name="larning_rate",
+                learning_rate=initial_entropy_beta,
+                end_learning_rate=final_entropy_beta,
+                decay_steps=entropy_beta_decay_steps,
+                global_step=tf.train.get_global_step())
 
         with arg_scope([layers.conv2d], data_format="NCHW"), \
              arg_scope([layers.fully_connected, layers.conv2d], activation_fn=self.activation_fn):
-            # TODO make it configurable from yaml
             self.ops.pi, self.ops.v = self.create_architecture()
         self._prepare_loss_op()
         self._params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self._name_scope)

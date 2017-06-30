@@ -1,4 +1,5 @@
 threads_num: 16
+#epochs: ??
 
 network_type: networks.ADQNLstmNet
 recurrent_units_num: 256
@@ -7,7 +8,7 @@ fc_units_num: 256
 # General training options
 local_steps_per_epoch: 50000
 run_tests: true
-max_remembered_steps: 5
+max_remembered_steps: 20
 constant_learning_rate: true
 initial_learning_rate: 0.00025
 final_learning_rate: 0.0000001
