@@ -6,7 +6,8 @@ recurrent_units_num: 256
 fc_units_num: 256
 
 # General training options
-local_steps_per_epoch: 50000
+local_steps_per_epoch: 32000
+test_episodes_per_epoch: 100
 run_tests: true
 
 max_remembered_steps: 20
