@@ -1,5 +1,6 @@
-tensorflow-gpu=1.2
-vizdoom=1.1.2
+tensorflow-gpu==1.2.0
+vizdoom==1.1.2
 ruamel.yaml
 numpy
-cv2=3.1.0
+tqdm
+cv2==3.1.0
