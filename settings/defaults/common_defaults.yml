@@ -5,7 +5,6 @@ conv_strides: [ 4, 2, 1 ]
 
 # Some output directories
 models_path: models
-logdir: logs
 logfile: null
 tf_logdir: tensorboard_logs
 tf_log_level: 2
