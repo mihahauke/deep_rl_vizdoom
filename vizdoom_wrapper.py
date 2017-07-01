@@ -78,11 +78,10 @@ class VizdoomWrapper(object):
 
         gvars_misc_len = len(doom.get_available_game_variables())
         if use_misc and (gvars_misc_len or input_n_last_actions):
-            if misc_scale:
+            if misc_scale is not None:
                 assert len(misc_scale) <= gvars_misc_len
                 self.misc_scale = np.ones(gvars_misc_len, dtype=np.float32)
                 self.misc_scale[0:len(misc_scale)] = misc_scale
-
             self.misc_len = gvars_misc_len * self._stack_n_frames
             if input_n_last_actions:
                 self.input_n_last_actions = input_n_last_actions
@@ -106,7 +105,7 @@ class VizdoomWrapper(object):
     def _update_misc(self):
         # TODO add support for input_n_actions without game variables
         game_vars = self.doom.get_state().game_variables
-        if self.misc_scale:
+        if self.misc_scale is not None:
             game_vars *= self.misc_scale
         if self.input_n_last_actions:
             game_vars_end_i = -len(self.last_n_actions)
