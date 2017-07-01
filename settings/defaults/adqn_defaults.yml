@@ -10,7 +10,7 @@ local_steps_per_epoch: 50000
 run_tests: true
 max_remembered_steps: 20
 constant_learning_rate: true
-initial_learning_rate: 0.00025
+initial_learning_rate: 0.00007
 final_learning_rate: 0.0000001
 learning_rate_decay_steps: 10e07
 frozen_global_steps: 40000
