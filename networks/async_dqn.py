@@ -15,23 +15,13 @@ from .common import _BaseNetwork, gather_2d
 # TODO add dueling
 class ADQNNet(_BaseNetwork):
     def __init__(self,
-                 img_shape,
-                 misc_len=0,
                  thread="global",
                  fc_units_num=512,
                  **settings):
 
         super(ADQNNet, self).__init__(fc_units_num=fc_units_num, **settings)
 
-        self.ops = Record()
-        self.vars = Record()
-        self.vars.state_img = tf.placeholder(tf.float32, [None] + list(img_shape), name="state_img")
-        self.use_misc = misc_len > 0
-        if self.use_misc:
-            self.vars.state_misc = tf.placeholder("float", [None, misc_len], name="state_misc")
         self._name_scope = self._get_name_scope() + "_" + str(thread)
-
-        self.params = None
 
         with arg_scope([layers.conv2d], data_format="NCHW"), \
              arg_scope([layers.fully_connected, layers.conv2d], activation_fn=self.activation_fn):
@@ -61,15 +51,13 @@ class ADQNNet(_BaseNetwork):
         self.ops.loss = 0.5 * tf.reduce_sum((active_q - self.vars.target_q) ** 2)
 
     def create_architecture(self):
-        conv_layers = self.get_conv_layers(self.vars.state_img, self._name_scope)
-
-        if self.use_misc:
-            fc_input = tf.concat(values=[conv_layers, self.vars.state_misc], axis=1)
-        else:
-            fc_input = conv_layers
-
-        fc1 = layers.fully_connected(fc_input, num_outputs=self.fc_units_num, scope=self._name_scope + "/fc1")
-        q = layers.linear(fc1, num_outputs=self.actions_num, scope=self._name_scope + "/q")
+        fc_input = self.get_input_layers()
+        fc1 = layers.fully_connected(fc_input,
+                                     num_outputs=self.fc_units_num,
+                                     scope=self._name_scope + "/fc1")
+        q = layers.linear(fc1,
+                          num_outputs=self.actions_num,
+                          scope=self._name_scope + "/q")
         return q
 
     def get_standard_feed_dict(self, state):

@@ -7,15 +7,11 @@ from tensorflow.contrib.rnn import LSTMStateTuple
 from tensorflow.contrib.framework import arg_scope
 from tensorflow.contrib import layers
 
-from util import Record
-
 from .common import _BaseNetwork, gather_2d
 
 
 class _BaseACNet(_BaseNetwork):
     def __init__(self,
-                 img_shape,
-                 misc_len=0,
                  initial_entropy_beta=0.05,
                  final_entropy_beta=0.0,
                  entropy_beta_decay_steps=10e6,
@@ -23,17 +19,7 @@ class _BaseACNet(_BaseNetwork):
                  **settings):
 
         super(_BaseACNet, self).__init__(**settings)
-
-        self.ops = Record()
-        self.vars = Record()
-        self.vars.state_img = tf.placeholder(tf.float32, [None] + list(img_shape), name="state_img")
-        self.use_misc = misc_len > 0
-        if self.use_misc:
-            self.vars.state_misc = tf.placeholder("float", [None, misc_len], name="state_misc")
-
         self._name_scope = self._get_name_scope() + "_" + str(thread)
-
-        self._params = None
 
         if initial_entropy_beta == final_entropy_beta:
             self._entropy_beta = initial_entropy_beta
@@ -48,14 +34,18 @@ class _BaseACNet(_BaseNetwork):
         with arg_scope([layers.conv2d], data_format="NCHW"), \
              arg_scope([layers.fully_connected, layers.conv2d], activation_fn=self.activation_fn):
             self.ops.pi, self.ops.v = self.create_architecture()
+
         self._prepare_loss_op()
-        self._params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self._name_scope)
+        self.params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self._name_scope)
 
     def policy_value_layer(self, inputs):
-        pi = layers.fully_connected(inputs, num_outputs=self.actions_num,
+        pi = layers.fully_connected(inputs,
+                                    num_outputs=self.actions_num,
                                     scope=self._name_scope + "/fc_pi",
                                     activation_fn=tf.nn.softmax)
-        state_value = layers.linear(inputs, num_outputs=1, scope=self._name_scope + "/fc_value")
+        state_value = layers.linear(inputs,
+                                    num_outputs=1,
+                                    scope=self._name_scope + "/fc_value")
         v = tf.reshape(state_value, [-1])
         return pi, v
 
@@ -86,7 +76,7 @@ class _BaseACNet(_BaseNetwork):
 
     def get_standard_feed_dict(self, state):
         feed_dict = {self.vars.state_img: [state[0]]}
-        if self.use_misc > 0:
+        if self.use_misc:
             if len(state[1].shape) == 1:
                 misc = state[1].reshape([1, -1])
             else:
@@ -107,7 +97,7 @@ class _BaseACNet(_BaseNetwork):
         return v[0]
 
     def get_params(self):
-        return self._params
+        return self.params
 
     def has_state(self):
         return False
@@ -128,14 +118,11 @@ class ACFFNet(_BaseACNet):
         return "ff_ac"
 
     def create_architecture(self):
-        conv_layers = self.get_conv_layers(self.vars.state_img, self._name_scope)
+        fc_input = self.get_input_layers()
 
-        if self.use_misc:
-            fc_input = tf.concat(values=[conv_layers, self.vars.state_misc], axis=1)
-        else:
-            fc_input = conv_layers
-
-        fc1 = layers.fully_connected(fc_input, num_outputs=self.fc_units_num, scope=self._name_scope + "/fc1",
+        fc1 = layers.fully_connected(fc_input,
+                                     num_outputs=self.fc_units_num,
+                                     scope=self._name_scope + "/fc1",
                                      biases_initializer=tf.constant_initializer(0.1))
 
         return self.policy_value_layer(fc1)
@@ -148,7 +135,6 @@ class _BaseACRecurrentNet(_BaseACNet):
                  ):
         self.recurrent_cells = None
         self.network_state = None
-        # TODO make it configurable in jsons
         self._recurrent_units_num = recurrent_units_num
         super(_BaseACRecurrentNet, self).__init__(**settings)
 
@@ -158,11 +144,7 @@ class _BaseACRecurrentNet(_BaseACNet):
     def create_architecture(self, **specs):
         self.vars.sequence_length = tf.placeholder(tf.int64, [1], name="sequence_length")
 
-        conv_layers = self.get_conv_layers(self.vars.state_img, self._name_scope)
-        if self.use_misc:
-            fc_input = tf.concat(values=[conv_layers, self.vars.state_misc], axis=1)
-        else:
-            fc_input = conv_layers
+        fc_input = self.get_input_layers()
 
         fc1 = layers.fully_connected(fc_input, num_outputs=self.fc_units_num,
                                      scope=self._name_scope + "/fc1",
@@ -227,11 +209,11 @@ class _BaseACRecurrentNet(_BaseACNet):
         return True
 
 
-class ASBacisLstmNet(_BaseACRecurrentNet):
+class ACBacisLstmNet(_BaseACRecurrentNet):
     def __init__(self,
                  **settings
                  ):
-        super(ASBacisLstmNet, self).__init__(**settings)
+        super(ACBacisLstmNet, self).__init__(**settings)
 
     def _get_name_scope(self):
         return "basic_lstm_ac"
