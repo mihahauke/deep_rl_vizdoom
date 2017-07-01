@@ -299,7 +299,7 @@ class A3CLearner(Thread):
 
                         last_log_time = time.time()
                         local_steps_for_log = 0
-                        log("Leargning rate: {}".format(self._session.run(self.learning_rate)))
+                        log("Learning rate: {}".format(self._session.run(self.learning_rate)))
 
                         # Saves model
                         if self._epoch % self.save_interval == 0:
@@ -485,7 +485,7 @@ class ADQNLearner(A3CLearner):
                         last_log_time = time.time()
                         local_steps_for_log = 0
 
-                        log("Leargning rate: {}".format(self._session.run(self.learning_rate)))
+                        log("Learning rate: {}".format(self._session.run(self.learning_rate)))
 
                         # Saves model
                         if self._epoch % self.save_interval == 0:
