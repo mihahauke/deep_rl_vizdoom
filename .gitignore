@@ -98,3 +98,5 @@ erlogs
 clear_logs.sh
 test.py
 settings/*test.yml
+clean.sh
+tb.sh
