@@ -1,0 +1,13 @@
+config_file: basic.cfg
+scenario_tag: basic
+reward_scale: 0.01
+
+# General training options
+local_steps_per_epoch: 4000
+test_episodes_per_epoch: 100
+
+frozen_global_steps: 2000
+
+
+
+use_misc: false
