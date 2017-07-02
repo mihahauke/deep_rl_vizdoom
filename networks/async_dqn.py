@@ -132,12 +132,8 @@ class ADQNLstmNet(ADQNNet):
 
     def create_architecture(self):
         self.vars.sequence_length = tf.placeholder(tf.int64, [1], name="sequence_length")
-        conv_layers = self.get_conv_layers(self.vars.state_img, self._name_scope)
+        fc_input = self.get_input_layers()
 
-        if self.use_misc:
-            fc_input = tf.concat(values=[conv_layers, self.vars.state_misc], axis=1)
-        else:
-            fc_input = conv_layers
         fc1 = layers.fully_connected(fc_input, self.fc_units_num, scope=self._name_scope + "/fc1")
         fc1_reshaped = tf.reshape(fc1, [1, -1, self.fc_units_num])
 
