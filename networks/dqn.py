@@ -122,12 +122,7 @@ class DuelingDQNNet(DQNNet):
     def create_architecture(self, img_input, misc_input, name_scope, reuse=False, **specs):
         with arg_scope([layers.conv2d, layers.fully_connected], reuse=reuse), \
              arg_scope([], reuse=reuse):
-            conv_layers = self.get_conv_layers(img_input, name_scope)
-
-            if self.use_misc:
-                fc_input = tf.concat(values=[conv_layers, misc_input], axis=1)
-            else:
-                fc_input = conv_layers
+            fc_input = self.get_input_layers(img_input, misc_input, name_scope)
 
             fc1 = layers.fully_connected(fc_input, num_outputs=self.fc_units_num, scope=name_scope + "/fc1")
 
