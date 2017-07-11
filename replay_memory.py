@@ -4,8 +4,8 @@ import random
 import numpy as np
 
 
-class ReplayMemory:
-    def __init__(self, img_shape, misc_len=0, capacity=10000, batch_size=32,dtype=np.float32):
+class ReplayMemory(object):
+    def __init__(self, img_shape, misc_len=0, capacity=10000, batch_size=32, dtype=np.float32):
         self._s1_img = np.zeros([capacity] + list(img_shape), dtype=dtype)
         self._s2_img = np.zeros([capacity] + list(img_shape), dtype=dtype)
         self._a = np.zeros(capacity, dtype=np.int32)
@@ -17,7 +17,7 @@ class ReplayMemory:
 
         self._a_buf = np.zeros(batch_size, dtype=dtype)
         self._r_buf = np.zeros(batch_size, dtype=dtype)
-        self.termianl_buf = np.zeros(batch_size, dtype=np.bool_)
+        self.terminal_buf = np.zeros(batch_size, dtype=np.bool_)
 
         if misc_len > 0:
             self._s1_misc = np.zeros((capacity, misc_len), dtype=dtype)
@@ -42,7 +42,7 @@ class ReplayMemory:
         ret["s2_img"] = self._s2_img_buf
         ret["a"] = self._a_buf
         ret["r"] = self._r_buf
-        ret["terminal"] = self.termianl_buf
+        ret["terminal"] = self.terminal_buf
         if misc_len > 0:
             ret["s1_misc"] = self._s1_misc_buf
             ret["s2_misc"] = self._s2_misc_buf
@@ -73,6 +73,7 @@ class ReplayMemory:
         if self._batch_size > self.size:
             raise Exception("Replay memory doesn't contain " + str(self._batch_size) + " entries.")
         indexes = random.sample(range(0, self.size), self._batch_size)
+
         self._s1_img_buf[:] = self._s1_img[indexes]
         self._s2_img_buf[:] = self._s2_img[indexes]
         if self._misc:
@@ -80,5 +81,7 @@ class ReplayMemory:
             self._s2_misc_buf[:] = self._s2_misc[indexes]
         self._a_buf[:] = self._a[indexes]
         self._r_buf[:] = self._r[indexes]
-        self.termianl_buf[:] = self._terminal[indexes]
+        self.terminal_buf[:] = self._terminal[indexes]
         return self._ret_dict
+
+
