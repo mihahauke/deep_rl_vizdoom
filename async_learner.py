@@ -24,8 +24,9 @@ class A3CLearner(Thread):
                  thread_index,
                  network_type,
                  global_steps_counter,
-                 session=None,
                  scenario_tag=None,
+                 run_id_string=None,
+                 session=None,
                  tf_logdir=None,
                  global_network=None,
                  optimizer=None,
@@ -66,18 +67,11 @@ class A3CLearner(Thread):
         self.gamma = np.float32(settings["gamma"])
 
         if self.write_summaries and thread_index == 0 and not test_only:
-            date_string = strftime(settings["tag_date_format"])
-            network_name = network_type.split(".")[-1]
-            self._run_string = "{}/{}_{}TH/{}".format(scenario_tag,
-                                                      network_name,
-                                                      settings["threads_num"],
-                                                      date_string)
+            assert tf_logdir is not None
+            self.run_id_string = run_id_string
             self.tf_models_path = settings["models_path"]
-            if tf_logdir is not None:
-                if settings["run_tag"] is not None:
-                    tf_logdir += "/" + str(settings["run_tag"])
-                if not os.path.isdir(tf_logdir):
-                    os.makedirs(tf_logdir)
+            if not os.path.isdir(tf_logdir):
+                os.makedirs(tf_logdir)
 
             if self.tf_models_path is not None:
                 if not os.path.isdir(settings["models_path"]):
@@ -107,16 +101,16 @@ class A3CLearner(Thread):
             self.local_network.prepare_sync_op(global_network)
 
         if self.thread_index == 0 and not test_only:
-            self._model_savefile = settings["models_path"] + "/" + self._run_string
+            self._model_savefile = settings["models_path"] + "/" + self.run_id_string
 
             if self.write_summaries:
                 self.scores_placeholder, summaries = setup_vector_summaries(scenario_tag + "/scores")
                 lr_summary = tf.summary.scalar(scenario_tag + "/learning_rate", self.learning_rate)
                 summaries.append(lr_summary)
                 self._summaries = tf.summary.merge(summaries)
-                self._train_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self._run_string, "train"),
+                self._train_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self.run_id_string, "train"),
                                                            flush_secs=writer_flush_secs, max_queue=writer_max_queue)
-                self._test_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self._run_string, "test"),
+                self._test_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self.run_id_string, "test"),
                                                           flush_secs=writer_flush_secs, max_queue=writer_max_queue)
 
     @staticmethod

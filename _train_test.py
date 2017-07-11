@@ -32,9 +32,15 @@ def _test_common(args, settings):
 
 
 def _train_common(settings):
-    if settings["logfile"] is not None:
-        setup_file_logger(settings["logfile"], add_date=True)
+    network_name = settings["network_type"].split(".")[-1]
+    run_id_string = "{}/{}".format(strftime(settings["date_format"]), network_name)
+    if settings["run_tag"] is not None:
+        run_id_string += "/" + str(settings["run_tag"])
 
+    if settings["logdir"] is not None:
+        logfile = os.path.join(settings["logdir"], run_id_string.replace("/", "_"))
+        setup_file_logger(logfile)
+    settings["run_id_string"] = run_id_string
     log("Settings:")
     print_settings(settings)
 

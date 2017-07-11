@@ -1,3 +1,5 @@
+network_type: null
+
 # Convolution layers params layers:
 conv_filters_num: [ 32, 64, 64 ]
 conv_filters_sizes: [ 8, 4, 3 ]
@@ -5,10 +7,10 @@ conv_strides: [ 4, 2, 1 ]
 
 # Some output directories
 models_path: models
-logfile: null
+logdir: logs
 tf_logdir: tensorboard_logs
 tf_log_level: 2
-tag_date_format: "%m.%d_%H-%M"
+date_format: "%m.%d_%H-%M"
 run_tag: null
 write_summaries: True
 epochs: Inf

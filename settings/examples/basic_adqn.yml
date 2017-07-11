@@ -8,6 +8,5 @@ test_episodes_per_epoch: 100
 
 frozen_global_steps: 2000
 
-
-
+run_tag: example
 use_misc: false

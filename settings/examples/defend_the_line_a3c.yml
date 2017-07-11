@@ -1,7 +1,7 @@
-config_file: defend_the_center.cfg
-scenario_tag: defend_center
+config_file: defend_the_line.cfg
+scenario_tag: defend_line
 
-epochs: 30
+epochs: 50
 local_steps_per_epoch: 32000
 test_episodes_per_epoch: 100
 
@@ -13,6 +13,6 @@ initial_entropy_beta: 0.05
 final_entropy_beta: 0.0
 learning_rate_decay_steps: 1e6
 
-run_tag: example
+logfile: logs/a3c_defend_the_line.log
 
 use_misc: false

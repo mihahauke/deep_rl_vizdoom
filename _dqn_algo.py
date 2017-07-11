@@ -20,7 +20,8 @@ import networks
 
 class DQN(object):
     def __init__(self,
-                 scenario_tag,
+                 scenario_tag=None,
+                 run_id_string=None,
                  network_type="networks.DQNNet",
                  write_summaries=True,
                  tf_logdir="tensorboard_logs",
@@ -60,9 +61,7 @@ class DQN(object):
         self.update_pattern = update_pattern
         self.write_summaries = write_summaries
         self._settings = settings
-        date_string = strftime(settings["tag_date_format"])
-        network_name = network_type.split(".")[-1]
-        self._run_string = "{}/{}/{}".format(scenario_tag, network_name, date_string)
+        self.run_id_string = run_id_string
         self.train_steps_per_epoch = train_steps_per_epoch
         self._run_tests = test_episodes_per_epoch > 0 and run_tests
         self.test_episodes_per_epoch = test_episodes_per_epoch
@@ -83,20 +82,18 @@ class DQN(object):
 
         self.save_interval = save_interval
 
-        self._model_savefile = settings["models_path"] + "/" + self._run_string
+        self._model_savefile = settings["models_path"] + "/" + self.run_id_string
         ## TODO move summaries somewhere so they are consistent between dqn and asyncs
         if self.write_summaries:
-            if tf_logdir is not None:
-                if settings["run_tag"] is not None:
-                    tf_logdir += "/" + str(settings["run_tag"])
-                if not os.path.isdir(tf_logdir):
-                    os.makedirs(tf_logdir)
+            assert tf_logdir is not None
+            if not os.path.isdir(tf_logdir):
+                os.makedirs(tf_logdir)
 
             self.scores_placeholder, summaries = setup_vector_summaries(scenario_tag + "/scores")
             self._summaries = tf.summary.merge(summaries)
-            self._train_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self._run_string, "train"),
+            self._train_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self.run_id_string, "train"),
                                                        flush_secs=writer_flush_secs, max_queue=writer_max_queue)
-            self._test_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self._run_string, "test"),
+            self._test_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self.run_id_string, "test"),
                                                       flush_secs=writer_flush_secs, max_queue=writer_max_queue)
         else:
             self._train_writer = None

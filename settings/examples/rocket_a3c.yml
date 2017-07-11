@@ -14,6 +14,6 @@ initial_entropy_beta: 0.05
 final_entropy_beta: 0.0
 learning_rate_decay_steps: 1e5
 
-logfile: logs/a3c_rocket.log
+run_tag: example
 
 use_misc: false

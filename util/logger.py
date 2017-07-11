@@ -18,12 +18,8 @@ error = _logger.error
 debug = _logger.debug
 
 
-def setup_file_logger(logfile=None, append=True, add_date=False):
+def setup_file_logger(logfile=None, append=True):
     if logfile is not None:
-        if add_date:
-            if logfile.endswith(".log"):
-                logfile = logfile[0:-4]
-            logfile = logfile + "_" + strftime("%d.%m.%y_%H-%M")
         if not logfile.endswith(".log"):
             logfile += ".log"
 
