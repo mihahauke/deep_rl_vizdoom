@@ -6,7 +6,7 @@ from time import strftime
 
 from vizdoom_wrapper import VizdoomWrapper
 from tqdm import trange
-from random import random, randint
+from random import random, randint, choice
 import os
 from replay_memory import ReplayMemory
 from time import time
@@ -41,12 +41,21 @@ class DQN(object):
                  save_interval=1,
                  writer_max_queue=10,
                  writer_flush_secs=120,
+                 dynamic_frameskips=None,
                  **settings):
 
         if prioritized_memory:
             raise NotImplementedError("Prioritized memory not implemented. Maybe some day.")
             # TODO maybe some day ...
             pass
+
+        if dynamic_frameskips:
+            if isinstance(dynamic_frameskips, (list, tuple)):
+                self.frameskips = list(dynamic_frameskips)
+            elif isinstance(dynamic_frameskips, int):
+                self.frameskips = list(range(1, dynamic_frameskips + 1))
+        else:
+            self.frameskips = [None]
 
         self.update_pattern = update_pattern
         self.write_summaries = write_summaries
@@ -65,7 +74,7 @@ class DQN(object):
         self.use_misc = self.doom_wrapper.use_misc
         self.actions_num = self.doom_wrapper.actions_num
         self.replay_memory = ReplayMemory(img_shape, misc_len, batch_size=batchsize, capacity=memory_capacity)
-        self.network = eval(network_type)(actions_num=self.actions_num, img_shape=img_shape,
+        self.network = eval(network_type)(actions_num=self.actions_num * len(self.frameskips), img_shape=img_shape,
                                           misc_len=misc_len,
                                           **settings)
 
@@ -75,13 +84,20 @@ class DQN(object):
         self.save_interval = save_interval
 
         self._model_savefile = settings["models_path"] + "/" + self._run_string
+        ## TODO move summaries somewhere so they are consistent between dqn and asyncs
         if self.write_summaries:
+            if tf_logdir is not None:
+                if settings["run_tag"] is not None:
+                    tf_logdir += "/" + str(settings["run_tag"])
+                if not os.path.isdir(tf_logdir):
+                    os.makedirs(tf_logdir)
+
             self.scores_placeholder, summaries = setup_vector_summaries(scenario_tag + "/scores")
             self._summaries = tf.summary.merge(summaries)
             self._train_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self._run_string, "train"),
-                                                           flush_secs=writer_flush_secs,max_queue=writer_max_queue)
+                                                       flush_secs=writer_flush_secs, max_queue=writer_max_queue)
             self._test_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self._run_string, "test"),
-                                                           flush_secs=writer_flush_secs,max_queue=writer_max_queue)
+                                                      flush_secs=writer_flush_secs, max_queue=writer_max_queue)
         else:
             self._train_writer = None
             self._test_writer = None
@@ -101,6 +117,11 @@ class DQN(object):
     def get_current_epsilon(self):
         eps = self.initial_epsilon - (self.steps - self.epsilon_decay_start_step) * self.epsilon_decay_rate
         return np.clip(eps, self.final_epsilon, 1.0)
+
+    def get_action_and_frameskip(self, ai):
+        action = ai % self.actions_num
+        frameskip = self.frameskips[ai // self.actions_num]
+        return action, frameskip
 
     @staticmethod
     def print_epoch_log(prefix, scores, steps, epoch_time):
@@ -150,11 +171,12 @@ class DQN(object):
             if self.doom_wrapper.is_terminal():
                 self.doom_wrapper.reset()
             s1 = self.doom_wrapper.get_current_state()
-            action_index = randint(0, self.actions_num - 1)
-            reward = self.doom_wrapper.make_action(action_index)
+            action_frameskip_index = randint(0, self.actions_num * len(self.frameskips) - 1)
+            action_index, frameskip = self.get_action_and_frameskip(action_frameskip_index)
+            reward = self.doom_wrapper.make_action(action_index, frameskip)
             terminal = self.doom_wrapper.is_terminal()
             s2 = self.doom_wrapper.get_current_state()
-            self.replay_memory.add_transition(s1, action_index, s2, reward, terminal)
+            self.replay_memory.add_transition(s1, action_frameskip_index, s2, reward, terminal)
 
         overall_start_time = time()
         self.network.update_target_network(session)
@@ -172,13 +194,16 @@ class DQN(object):
                 s1 = self.doom_wrapper.get_current_state()
 
                 if random() <= self.get_current_epsilon():
-                    action_index = randint(0, self.actions_num - 1)
+                    action_frameskip_index = randint(0, self.actions_num*len(self.frameskips) - 1)
+                    action_index, frameskip = self.get_action_and_frameskip(action_frameskip_index)
                 else:
-                    action_index = self.network.get_action(session, s1)
-                reward = self.doom_wrapper.make_action(action_index)
+                    action_frameskip_index = self.network.get_action(session, s1)
+                    action_index, frameskip = self.get_action_and_frameskip(action_frameskip_index)
+
+                reward = self.doom_wrapper.make_action(action_index, frameskip)
                 terminal = self.doom_wrapper.is_terminal()
                 s2 = self.doom_wrapper.get_current_state()
-                self.replay_memory.add_transition(s1, action_index, s2, reward, terminal)
+                self.replay_memory.add_transition(s1, action_frameskip_index, s2, reward, terminal)
 
                 if self.steps % self.update_pattern[0] == 0:
                     for _ in range(self.update_pattern[1]):
@@ -204,8 +229,9 @@ class DQN(object):
                 while not self.doom_wrapper.is_terminal():
                     test_steps += 1
                     state = self.doom_wrapper.get_current_state()
-                    a = self.network.get_action(session, state)
-                    self.doom_wrapper.make_action(a)
+                    action_frameskip_index = self.network.get_action(session, state)
+                    action_index, frameskip = self.get_action_and_frameskip(action_frameskip_index)
+                    self.doom_wrapper.make_action(action_index, frameskip)
 
                 test_scores.append(self.doom_wrapper.get_total_reward())
 
@@ -239,7 +265,8 @@ class DQN(object):
         self.doom_wrapper.reset()
         while not self.doom_wrapper.is_terminal():
             state = self.doom_wrapper.get_current_state()
-            a = self.network.get_action(session, state)
-            self.doom_wrapper.make_action(a)
+            action_frameskip_index = self.network.get_action(session, state)
+            action_index, frameskip = self.get_action_and_frameskip(action_frameskip_index)
+            self.doom_wrapper.make_action(action_index, frameskip)
         reward = self.doom_wrapper.get_total_reward()
         return reward

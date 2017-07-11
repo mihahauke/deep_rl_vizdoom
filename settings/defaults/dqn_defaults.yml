@@ -5,9 +5,9 @@ fc_units_num: 256
 
 double: true
 prioritized_memory: false
-batchsize: 64
+batchsize: 32
 memory_capacity: 10000
-frozen_steps: 40000
+frozen_steps: 5000
 update_pattern: [4, 4]
 
 # Training params

@@ -19,7 +19,8 @@ test_episodes_per_epoch: 100
 # Vizdoom wrapper options:
 resolution: [ 80, 60 ]
 vizdoom_resolution: RES_160X120
-frame_skip: 4
+frameskip: 4
+dynamic_frameskips: null
 stack_n_frames: 4
 force_freedoom: false
 display: false

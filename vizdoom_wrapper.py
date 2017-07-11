@@ -10,7 +10,7 @@ import time
 class VizdoomWrapper(object):
     def __init__(self,
                  config_file,
-                 frame_skip=4,
+                 frameskip=4,
                  display=False,
                  async=False,
                  smooth_display=False,
@@ -60,7 +60,7 @@ class VizdoomWrapper(object):
         self._stack_n_frames = stack_n_frames
         assert len(resolution) == 2
         self._resolution = tuple(resolution)
-        self._frame_skip = frame_skip
+        self._frameskip = frameskip
         self._reward_scale = reward_scale
 
         self._img_channels = stack_n_frames
@@ -99,8 +99,7 @@ class VizdoomWrapper(object):
 
     def _update_screen(self):
         self._current_screen = self.preprocess(self.doom.get_state().screen_buffer)
-        self._current_stacked_screen = np.append(self._current_stacked_screen[1:], self._current_screen,
-                                                 axis=0)
+        self._current_stacked_screen = np.append(self._current_stacked_screen[1:], self._current_screen, axis=0)
 
     def _update_misc(self):
         # TODO add support for input_n_actions without game variables
@@ -139,7 +138,7 @@ class VizdoomWrapper(object):
 
     def make_action(self, action_index, frameskip=None):
         if frameskip is None:
-            frameskip = self._frame_skip
+            frameskip = self._frameskip
         action = self._actions[action_index]
 
         reward = self.doom.make_action(action, frameskip) * self._reward_scale
@@ -158,6 +157,8 @@ class VizdoomWrapper(object):
         return reward
 
     def get_current_state(self):
+        if self.doom.is_episode_finished():
+            return None
         return self._current_stacked_screen, self._current_stacked_misc
 
     def get_total_reward(self):
