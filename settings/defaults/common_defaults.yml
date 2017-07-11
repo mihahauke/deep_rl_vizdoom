@@ -8,7 +8,7 @@ models_path: models
 logfile: null
 tf_logdir: tensorboard_logs
 tf_log_level: 2
-tag_date_format: "%d%B%y_%H.%M"
+tag_date_format: "%m.%d_%H-%M"
 run_tag: null
 write_summaries: True
 epochs: Inf
@@ -19,6 +19,7 @@ test_episodes_per_epoch: 100
 # Vizdoom wrapper options:
 resolution: [ 80, 60 ]
 vizdoom_resolution: RES_160X120
+vizdoom_async_mode: false
 frameskip: 4
 dynamic_frameskips: null
 stack_n_frames: 4

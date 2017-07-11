@@ -12,7 +12,7 @@ class VizdoomWrapper(object):
                  config_file,
                  frameskip=4,
                  display=False,
-                 async=False,
+                 vizdoom_async_mode=False,
                  smooth_display=False,
                  fps=35,
                  resolution=(80, 60),
@@ -42,7 +42,7 @@ class VizdoomWrapper(object):
             doom.add_game_args("+viz_render_all 1")
         # TODO support for colors
         doom.set_screen_format(vzd.ScreenFormat.GRAY8)
-        if async:
+        if vizdoom_async_mode:
             doom.set_mode(vzd.Mode.ASYNC_PLAYER)
             doom.set_ticrate(int(fps))
         else:
