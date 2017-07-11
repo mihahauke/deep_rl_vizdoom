@@ -1,26 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from async import train_async
-
-from paths import DEFAULT_A3C_SETTINGS_FILE
-from util.parsers import parse_train_a3c_args
-import os
-
-from util.misc import print_settings, load_settings
-from util.logger import setup_file_logger, log
+from _train_test import train_adqn
 
 if __name__ == "__main__":
-    args = parse_train_a3c_args()
-
-    settings = load_settings(DEFAULT_A3C_SETTINGS_FILE, args.settings_yml)
-
-    if settings["logfile"] is not None:
-        setup_file_logger(settings["logfile"], add_date=True)
-
-    log("Settings:")
-    print_settings(settings)
-
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(settings["tf_log_level"])
-
-    train_async(q_learning=False, settings=settings)
+    train_adqn()
