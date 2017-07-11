@@ -46,7 +46,7 @@ def train_dqn():
     settings = load_settings(DEFAULT_DQN_SETTINGS_FILE, args.settings_yml)
     _train_common(settings)
 
-    from dqn import DQN
+    from _dqn_algo import DQN
     dqn = DQN(**settings)
 
     config = tf.ConfigProto()
@@ -62,7 +62,7 @@ def train_a3c():
     settings = load_settings(DEFAULT_A3C_SETTINGS_FILE, args.settings_yml)
     _train_common(settings)
 
-    from async import train_async
+    from _async_algo import train_async
     train_async(q_learning=False, settings=settings)
 
 
@@ -71,7 +71,7 @@ def train_adqn():
     settings = load_settings(DEFAULT_ADQN_SETTINGS_FILE, args.settings_yml)
     _train_common(settings)
 
-    from async import train_async
+    from _async_algo import train_async
     train_async(q_learning=True, settings=settings)
 
 
@@ -81,7 +81,7 @@ def test_dqn():
 
     _test_common(args, settings)
 
-    from dqn import DQN
+    from _dqn_algo import DQN
     dqn = DQN(**settings)
 
     config = tf.ConfigProto()
@@ -105,7 +105,7 @@ def test_a3c():
     settings = load_settings(DEFAULT_ADQN_SETTINGS_FILE, args.settings_yml)
     _test_common(args, settings)
 
-    from async import test_async
+    from _async_algo import test_async
     test_async(q_learning=False, settings=settings, modelfile=args.model, eps=args.episodes_num)
 
 
@@ -114,5 +114,5 @@ def test_adqn():
     settings = load_settings(DEFAULT_ADQN_SETTINGS_FILE, args.settings_yml)
     _test_common(args, settings)
 
-    from async import test_async
+    from _async_algo import test_async
     test_async(q_learning=True, settings=settings, modelfile=args.model, eps=args.episodes_num)
