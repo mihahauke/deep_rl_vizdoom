@@ -13,6 +13,10 @@ import numpy as np
 
 
 def train_async(q_learning, settings):
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    session = tf.Session(config=config)
+
     proto_vizdoom = VizdoomWrapper(noinit=True, **settings)
     actions_num = proto_vizdoom.actions_num
     misc_len = proto_vizdoom.misc_len
@@ -60,9 +64,7 @@ def train_async(q_learning, settings):
                                  **settings)
             learners.append(learner)
 
-    config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
-    session = tf.Session(config=config)
+
 
     log("Initializing variables...")
     session.run(tf.global_variables_initializer())
@@ -83,6 +85,9 @@ def test_async(q_learning, settings, modelfile, eps, deterministic=True):
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     session = tf.InteractiveSession(config=config)
+
+    # TODO: it's a workaround polynomial decays use global step, remove it somehow
+    tf.Variable(0, trainable=False, name="global_step")
 
     if q_learning:
         agent = ADQNLearner(thread_index=0, session=session, **settings)
