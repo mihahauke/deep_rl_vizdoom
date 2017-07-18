@@ -23,7 +23,7 @@ class A3CLearner(Thread):
     def __init__(self,
                  thread_index,
                  network_type,
-                 global_steps_counter,
+                 global_steps_counter=None,
                  scenario_tag=None,
                  run_id_string=None,
                  session=None,
