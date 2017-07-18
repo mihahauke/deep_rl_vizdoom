@@ -38,7 +38,7 @@ def _train_common(settings):
         run_id_string += "/" + str(settings["run_tag"])
 
     if settings["logdir"] is not None:
-        logfile = os.path.join(settings["logdir"], run_id_string.replace("/", "_"))
+        logfile = os.path.join(settings["logdir"], +settings["scenario_tag"] + "_" + run_id_string.replace("/", "_"))
         setup_file_logger(logfile)
     settings["run_id_string"] = run_id_string
     log("Settings:")
