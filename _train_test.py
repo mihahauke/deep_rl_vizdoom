@@ -16,7 +16,6 @@ from paths import *
 
 
 def _test_common(args, settings):
-    log("Loaded settings.")
     if args.print_settings:
         print_settings(settings)
 
