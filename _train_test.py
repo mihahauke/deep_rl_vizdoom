@@ -107,7 +107,7 @@ def test_dqn():
 
 def test_a3c():
     args = parse_test_a3c_args()
-    settings = load_settings(DEFAULT_ADQN_SETTINGS_FILE, args.settings_yml)
+    settings = load_settings(DEFAULT_A3C_SETTINGS_FILE, args.settings_yml)
     _test_common(args, settings)
 
     from _async_algo import test_async
