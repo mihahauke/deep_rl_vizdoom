@@ -13,6 +13,6 @@ initial_entropy_beta: 0.05
 final_entropy_beta: 0.0
 learning_rate_decay_steps: 1e6
 
-run_tag: example
+run_tag: example_a3c_center
 
 use_misc: false
