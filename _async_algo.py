@@ -23,7 +23,6 @@ def train_async(q_learning, settings):
     img_shape = proto_vizdoom.img_shape
     del proto_vizdoom
 
-    # TODO target global network
     # This global step counts gradient applications not performed actions.
     global_train_step = tf.Variable(0, trainable=False, name="global_step")
     global_learning_rate = tf.train.polynomial_decay(
