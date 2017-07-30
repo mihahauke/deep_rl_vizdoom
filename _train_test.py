@@ -49,6 +49,8 @@ def _train_common(settings):
 def train_dqn():
     args = parse_train_dqn_args()
     settings = load_settings(DEFAULT_DQN_SETTINGS_FILE, args.settings_yml)
+    if args.run_tag is not None:
+        settings["run_tag"] = args.run_tag
     _train_common(settings)
 
     from _dqn_algo import DQN
@@ -65,6 +67,8 @@ def train_dqn():
 def train_a3c():
     args = parse_train_a3c_args()
     settings = load_settings(DEFAULT_A3C_SETTINGS_FILE, args.settings_yml)
+    if args.run_tag is not None:
+        settings["run_tag"] = args.run_tag
     _train_common(settings)
 
     from _async_algo import train_async
@@ -74,6 +78,8 @@ def train_a3c():
 def train_adqn():
     args = parse_train_adqn_args()
     settings = load_settings(DEFAULT_ADQN_SETTINGS_FILE, args.settings_yml)
+    if args.run_tag is not None:
+        settings["run_tag"] = args.run_tag
     _train_common(settings)
 
     from _async_algo import train_async

@@ -24,14 +24,25 @@ def _create_default_parser(description):
     return parser
 
 
+def _create_train_parser(description):
+    parser = _create_default_parser(description=description)
+    parser.add_argument("--run_tag",
+                        "-rt",
+                        dest="run_tag",
+                        metavar="RUN_TAG",
+                        help="Prefix added to tensorboard summaries",
+                        default=None)
+    return parser
+
+
 def _create_test_parser(description):
     parser = _create_default_parser(description=description)
     parser.add_argument(
-                        dest="model",
-                        metavar="MODEL_FILE",
-                        type=str,
-                        help="Path to trained model."
-                        )
+        dest="model",
+        metavar="MODEL_FILE",
+        type=str,
+        help="Path to trained model."
+    )
     parser.add_argument("--episodes", "-e",
                         dest="episodes_num",
                         metavar="EPISODES_NUM",
@@ -75,27 +86,24 @@ def _create_test_parser(description):
                         type=int,
                         help="Seed for ViZDoom."
                         )
+
     return parser
 
 
-def _add_test_commons(parser):
-    parser.add_argument()
-
-
 def parse_train_a3c_args():
-    parser = _create_default_parser(description='A3C: training script for ViZDoom.')
+    parser = _create_train_parser(description='A3C: training script for ViZDoom.')
 
     return parser.parse_args()
 
 
 def parse_train_adqn_args():
-    parser = _create_default_parser(description='Asynchronous n-step DQN: training script for ViZDoom.')
+    parser = _create_train_parser(description='Asynchronous n-step DQN: training script for ViZDoom.')
 
     return parser.parse_args()
 
 
 def parse_train_dqn_args():
-    parser = _create_default_parser(description='DQN: training script for ViZDoom')
+    parser = _create_train_parser(description='DQN: training script for ViZDoom')
 
     return parser.parse_args()
 
@@ -105,10 +113,12 @@ def parse_test_dqn_args():
 
     return parser.parse_args()
 
+
 def parse_test_adqn_args():
     parser = _create_test_parser(description='Asynchronous n-step DQN: testing script for ViZDoom')
 
     return parser.parse_args()
+
 
 def parse_test_a3c_args():
     parser = _create_test_parser(description='A3C: testing script for ViZDoom')
