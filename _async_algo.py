@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from util.coloring import green
-from async_learner import A3CLearner, ADQNLearner
+import async_learner
 from util.logger import log
 from vizdoom_wrapper import VizdoomWrapper
 from util import ThreadsafeCounter
@@ -34,36 +34,39 @@ def train_async(q_learning, settings):
     optimizer = ClippingRMSPropOptimizer(learning_rate=global_learning_rate, **settings["rmsprop"])
 
     learners = []
-    network_class = eval(settings["network_type"])
-
-    global_network = network_class(actions_num=actions_num, misc_len=misc_len, img_shape=img_shape,
-                                   **settings)
-
+    NetworkClass = getattr(networks, settings["network_class"])
+    
+    global_network = NetworkClass(actions_num=actions_num,
+                                  misc_len=misc_len,
+                                  img_shape=img_shape,
+                                  **settings)
     global_steps_counter = ThreadsafeCounter()
+
     if q_learning:
-        global_target_network = network_class(thread="global_target", actions_num=actions_num,
-                                              misc_len=misc_len,
-                                              img_shape=img_shape, **settings)
+        global_target_network = NetworkClass(thread="global_target",
+                                             actions_num=actions_num,
+                                             misc_len=misc_len,
+                                             img_shape=img_shape, **settings)
         global_network.prepare_unfreeze_op(global_target_network)
         unfreeze_thread = min(1, settings["threads_num"] - 1)
         for i in range(settings["threads_num"]):
-            learner = ADQNLearner(thread_index=i, global_network=global_network,
-                                  unfreeze_thread=i == unfreeze_thread,
-                                  global_target_network=global_target_network,
-                                  optimizer=optimizer,
-                                  learning_rate=global_learning_rate,
-                                  global_steps_counter=global_steps_counter,
-                                  **settings)
+            learner = async_learner.ADQNLearner(thread_index=i, global_network=global_network,
+                                                unfreeze_thread=i == unfreeze_thread,
+                                                global_target_network=global_target_network,
+                                                optimizer=optimizer,
+                                                learning_rate=global_learning_rate,
+                                                global_steps_counter=global_steps_counter,
+                                                **settings)
             learners.append(learner)
     else:
+
         for i in range(settings["threads_num"]):
-            learner = A3CLearner(thread_index=i, global_network=global_network,
-                                 optimizer=optimizer, learning_rate=global_learning_rate,
-                                 global_steps_counter=global_steps_counter,
-                                 **settings)
+            LearnerClass = getattr(async_learner, settings["learner_class"])
+            learner = LearnerClass(thread_index=i, global_network=global_network,
+                                   optimizer=optimizer, learning_rate=global_learning_rate,
+                                   global_steps_counter=global_steps_counter,
+                                   **settings)
             learners.append(learner)
-
-
 
     log("Initializing variables...")
     session.run(tf.global_variables_initializer())
@@ -89,9 +92,10 @@ def test_async(q_learning, settings, modelfile, eps, deterministic=True):
     tf.Variable(0, trainable=False, name="global_step")
 
     if q_learning:
-        agent = ADQNLearner(thread_index=0, session=session, **settings)
+        agent = async_learner.ADQNLearner(thread_index=0, session=session, **settings)
     else:
-        agent = A3CLearner(thread_index=0, session=session, **settings)
+        LearnerClass = getattr(async_learner, settings["learner_class"])
+        agent = LearnerClass(thread_index=0, session=session, **settings)
 
     log("Initializing variables...")
     session.run(tf.global_variables_initializer())

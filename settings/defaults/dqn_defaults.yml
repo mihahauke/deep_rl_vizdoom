@@ -1,5 +1,5 @@
 # Network
-network_type: networks.DuelingDQNNet
+network_class: DuelingDQNNet
 fc_units_num: 256
 #epochs: ??
 

@@ -1,7 +1,7 @@
 threads_num: 16
 #epochs: ??
 
-network_type: networks.ADQNLstmNet
+network_class: ADQNLstmNet
 recurrent_units_num: 256
 fc_units_num: 256
 

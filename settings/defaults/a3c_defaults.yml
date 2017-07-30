@@ -1,7 +1,8 @@
 threads_num: 16
 #epochs: ??
 
-network_type: networks.ACLstmNet
+learner_class: A3CLearner
+network_class: ACLstmNet
 recurrent_units_num: 256
 fc_units_num: 256
 

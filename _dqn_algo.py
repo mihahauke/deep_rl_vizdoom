@@ -22,7 +22,7 @@ class DQN(object):
     def __init__(self,
                  scenario_tag=None,
                  run_id_string=None,
-                 network_type="networks.DQNNet",
+                 network_class="DQNNet",
                  write_summaries=True,
                  tf_logdir="tensorboard_logs",
                  epochs=100,
@@ -73,9 +73,10 @@ class DQN(object):
         self.use_misc = self.doom_wrapper.use_misc
         self.actions_num = self.doom_wrapper.actions_num
         self.replay_memory = ReplayMemory(img_shape, misc_len, batch_size=batchsize, capacity=memory_capacity)
-        self.network = eval(network_type)(actions_num=self.actions_num * len(self.frameskips), img_shape=img_shape,
-                                          misc_len=misc_len,
-                                          **settings)
+        self.network = getattr(networks, network_class)(actions_num=self.actions_num * len(self.frameskips),
+                                                        img_shape=img_shape,
+                                                        misc_len=misc_len,
+                                                        **settings)
 
         self.batchsize = batchsize
         self.frozen_steps = frozen_steps
@@ -191,7 +192,7 @@ class DQN(object):
                 s1 = self.doom_wrapper.get_current_state()
 
                 if random() <= self.get_current_epsilon():
-                    action_frameskip_index = randint(0, self.actions_num*len(self.frameskips) - 1)
+                    action_frameskip_index = randint(0, self.actions_num * len(self.frameskips) - 1)
                     action_index, frameskip = self.get_action_and_frameskip(action_frameskip_index)
                 else:
                     action_frameskip_index = self.network.get_action(session, s1)

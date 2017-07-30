@@ -31,8 +31,7 @@ def _test_common(args, settings):
 
 
 def _train_common(settings):
-    network_name = settings["network_type"].split(".")[-1]
-    run_id_string = "{}/{}".format(strftime(settings["date_format"]), network_name)
+    run_id_string = "{}/{}".format(strftime(settings["date_format"]), settings["network_class"])
     if settings["run_tag"] is not None:
         run_id_string += "/" + str(settings["run_tag"])
 
