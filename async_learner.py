@@ -113,7 +113,7 @@ class A3CLearner(Thread):
                                                           flush_secs=writer_flush_secs, max_queue=writer_max_queue)
 
     @staticmethod
-    def choose_action_index(policy, deterministic=False):
+    def choose_best_index(policy, deterministic=False):
         if deterministic:
             return np.argmax(policy)
 
@@ -132,7 +132,6 @@ class A3CLearner(Thread):
         actions = []
         rewards_reversed = []
         values_reversed = []
-        advantages = []
         Rs = []
 
         self._session.run(self.local_network.ops.sync)
@@ -146,9 +145,8 @@ class A3CLearner(Thread):
         for _ in range(self.max_remembered_steps):
             steps_performed += 1
             current_img, current_misc = self.doom_wrapper.get_current_state()
-            policy, state_value = self.local_network.get_policy_and_value(self._session, [current_img, current_misc])
-            action_index = A3CLearner.choose_action_index(policy)
-            values_reversed.insert(0, state_value)
+            policy = self.local_network.get_policy(self._session, [current_img, current_misc])
+            action_index = A3CLearner.choose_best_index(policy)
             states_img.append(current_img)
             states_misc.append(current_misc)
             actions.append(action_index)
@@ -170,15 +168,13 @@ class A3CLearner(Thread):
         else:
             R = self.local_network.get_value(self._session, self.doom_wrapper.get_current_state())
 
-        for ri, Vi in zip(rewards_reversed, values_reversed):
+        for ri in rewards_reversed:
             R = ri + self.gamma * R
-            advantages.insert(0, R - Vi)
             Rs.insert(0, R)
 
         train_op_feed_dict = {
             self.local_network.vars.state_img: states_img,
             self.local_network.vars.a: actions,
-            self.local_network.vars.advantage: advantages,
             self.local_network.vars.R: Rs
         }
         if self.use_misc:
@@ -323,8 +319,9 @@ class A3CLearner(Thread):
 
     def _get_best_action(self, sess, state, deterministic=True):
         policy = self.local_network.get_policy(sess, state)
-        action_index = self.choose_action_index(policy, deterministic=deterministic)
-        return action_index, None
+        action_index = self.choose_best_index(policy, deterministic=deterministic)
+        frameskip = None
+        return action_index, frameskip
 
 
 class ADQNLearner(A3CLearner):
@@ -493,30 +490,36 @@ class ADQNLearner(A3CLearner):
     def _get_best_action(self, sess, state, deterministic=True):
         q = self.local_network.get_q_values(sess, state).flatten()
         action_index = q.argmax()
-        return action_index, None
+        frameskip = None
+        return action_index, frameskip
 
 
 class FigarA3CLearner(A3CLearner):
     def __init__(self,
-                 dynamic_frameskips,
+                 dynamic_frameskips=None,
+                 cfigar=False,
                  **args):
-        if dynamic_frameskips:
+        if dynamic_frameskips is not None:
+            self.continuous_frameskip = False
+            if cfigar:
+                raise ValueError()
             if isinstance(dynamic_frameskips, (list, tuple)):
                 self.frameskips = list(dynamic_frameskips)
             elif isinstance(dynamic_frameskips, int):
                 self.frameskips = list(range(1, dynamic_frameskips + 1))
-
+        elif not cfigar:
+            raise ValueError()
+        else:
+            self.continuous_frameskip = True
         super(FigarA3CLearner, self).__init__(dynamic_frameskips=dynamic_frameskips, **args)
 
     def make_training_step(self):
-        # TODO mostly coppied, just added frameskip, a bit wasteful
+        # TODO mostly coppied, just added frameskip, a bit wasteful (maybe merge it with basic learner after all...)
         states_img = []
         states_misc = []
         actions = []
         frameskips = []
         rewards_reversed = []
-        values_reversed = []
-        advantages = []
         Rs = []
 
         self._session.run(self.local_network.ops.sync)
@@ -530,16 +533,25 @@ class FigarA3CLearner(A3CLearner):
         for _ in range(self.max_remembered_steps):
             steps_performed += 1
             current_img, current_misc = self.doom_wrapper.get_current_state()
-            policy, frameskip_policy, state_value = self.local_network.get_policy_and_value(self._session,
-                                                                                            [current_img, current_misc])
-            action_index = A3CLearner.choose_action_index(policy)
-            frameskip_index = self.choose_action_index(frameskip_policy)
-            values_reversed.insert(0, state_value)
+            action_policy, frameskip_policy = self.local_network.get_policy(self._session,
+                                                                            [current_img,
+                                                                             current_misc])
+            if self.continuous_frameskip:
+                mu, sigma = frameskip_policy
+                frameskip = self.choose_best_frameskip_continuous(mu, sigma)
+                frameskips.append(frameskip)
+            else:
+                frameskip_index = self.choose_best_index(frameskip_policy, deterministic=False)
+                frameskip = self.frameskips[frameskip_index]
+                frameskips.append(frameskip_index)
+
+            action_index = self.choose_best_index(action_policy, deterministic=False)
+
             states_img.append(current_img)
             states_misc.append(current_misc)
             actions.append(action_index)
-            frameskips.append(frameskip_index)
-            reward = self.doom_wrapper.make_action(action_index, self.frameskips[frameskip_index])
+
+            reward = self.doom_wrapper.make_action(action_index, frameskip)
             terminal = self.doom_wrapper.is_terminal()
 
             rewards_reversed.insert(0, reward)
@@ -557,16 +569,14 @@ class FigarA3CLearner(A3CLearner):
         else:
             R = self.local_network.get_value(self._session, self.doom_wrapper.get_current_state())
 
-        for ri, Vi in zip(rewards_reversed, values_reversed):
+        for ri in rewards_reversed:
             R = ri + self.gamma * R
-            advantages.insert(0, R - Vi)
             Rs.insert(0, R)
 
         train_op_feed_dict = {
             self.local_network.vars.state_img: states_img,
             self.local_network.vars.a: actions,
             self.local_network.vars.frameskip: frameskips,
-            self.local_network.vars.advantage: advantages,
             self.local_network.vars.R: Rs
 
         }
@@ -581,158 +591,22 @@ class FigarA3CLearner(A3CLearner):
 
         return steps_performed
 
+    @staticmethod
+    def choose_best_frameskip_continuous(mu, sigma, deterministic=False):
+        if deterministic:
+            frameskip_float = mu
+        else:
+            frameskip_float = np.random.normal(mu, sigma)
+        frameskip = max(1, round(frameskip_float))
+        return frameskip
+
     def _get_best_action(self, sess, state, deterministic=True):
         policy, frameskip_policy = self.local_network.get_policy(sess, state)
-        action_index = self.choose_action_index(policy, deterministic=deterministic)
-        frameskip_index = self.choose_action_index(frameskip_policy, deterministic=deterministic)
-        return action_index, self.frameskips[frameskip_index]
-
-# class ADFQNLearner(A3CLearner):
-#     def __init__(self,
-#                  frameskips,
-#                  network="TODO",
-#                  **args):
-#         super(ADFQNLearner, self).__init__(**args)
-#         raise NotImplementedError()
-#
-#     def make_training_step(self):
-#         raise NotImplementedError()
-#         states_img = []
-#         states_misc = []
-#         actions = []
-#         rewards_reversed = []
-#         target_qs = []
-#
-#         self._session.run(self.local_network.ops.sync)
-#         initial_network_state = None
-#         if self.local_network.has_state():
-#             initial_network_state = self.local_network.get_current_network_state()
-#
-#         terminal = None
-#         steps_performed = 0
-#         for _ in range(self.max_remembered_steps):
-#             steps_performed += 1
-#             current_img, current_misc = self.doom_wrapper.get_current_state()
-#
-#             if random.random() <= self.get_current_epsilon():
-#                 action_index = random.randint(0, self.actions_num - 1)
-#                 if self.local_network.has_state():
-#                     self.local_network.update_network_state(self._session, [current_img, current_misc])
-#             else:
-#                 q_values = self.local_network.get_q_values(self._session, [current_img, current_misc]).flatten()
-#                 action_index = q_values.argmax()
-#
-#             states_img.append(current_img)
-#             states_misc.append(current_misc)
-#             actions.append(action_index)
-#             reward = self.doom_wrapper.make_action(action_index)
-#             terminal = self.doom_wrapper.is_terminal()
-#             rewards_reversed.insert(0, reward)
-#             self.local_steps += 1
-#             if terminal:
-#                 if self.thread_index == 0:
-#                     self.train_scores.append(self.doom_wrapper.get_total_reward())
-#                 self.doom_wrapper.reset()
-#                 if self.local_network.has_state():
-#                     self.local_network.reset_state()
-#                 break
-#
-#         if terminal:
-#             target_q = 0.0
-#         else:
-#             if self.global_network.has_state():
-#                 q2 = self.global_target_network.get_q_values(self._session,
-#                                                              self.doom_wrapper.get_current_state(),
-#                                                              False,
-#                                                              self.local_network.get_current_network_state())
-#             else:
-#                 q2 = self.global_target_network.get_q_values(self._session,
-#                                                              self.doom_wrapper.get_current_state())
-#
-#             target_q = q2.max()
-#
-#         for ri in rewards_reversed:
-#             target_q = ri + self.gamma * target_q
-#             target_qs.insert(0, target_q)
-#
-#         # TODO delegate this to the network as train_batch(session, ...), maybe?
-#         train_op_feed_dict = {
-#             self.local_network.vars.state_img: states_img,
-#             self.local_network.vars.a: actions,
-#             self.local_network.vars.target_q: target_qs
-#         }
-#         if self.use_misc:
-#             train_op_feed_dict[self.local_network.vars.state_misc] = states_misc
-#
-#         if self.local_network.has_state():
-#             train_op_feed_dict[self.local_network.vars.initial_network_state] = initial_network_state
-#             train_op_feed_dict[self.local_network.vars.sequence_length] = [len(actions)]
-#
-#         self._session.run(self.train_op, feed_dict=train_op_feed_dict)
-#         return steps_performed
-#
-#     def run(self):
-#         raise NotImplementedError()
-#         # TODO this method is ugly, make it nicer ...and it's the same as above.... really TODO!!
-#         # Basically code copied from base class with unfreezing
-#         try:
-#             overall_start_time = time.time()
-#             last_log_time = overall_start_time
-#             local_steps_for_log = 0
-#             next_target_update = self.frozen_global_steps
-#             while self._epoch <= self._epochs:
-#                 steps = self.make_training_step()
-#                 local_steps_for_log += steps
-#                 global_steps = self._global_steps_counter.inc(steps)
-#
-#                 # Updating target network:
-#                 if self.unfreeze_thread:
-#                     # TODO this check is dangerous
-#                     if global_steps >= next_target_update:
-#                         next_target_update += self.frozen_global_steps
-#                         if next_target_update <= global_steps:
-#                             # TODO use warn from the logger
-#                             logging.warning(yellow("Global steps ({}) <= next target update ({}).".format(
-#                                 global_steps, next_target_update)))
-#
-#                         self._session.run(self.global_network.ops.unfreeze)
-#                 # Logs & tests
-#                 if self.local_steps_per_epoch * self._epoch <= self.local_steps:
-#                     self._epoch += 1
-#
-#                     if self.thread_index == 0:
-#                         self._print_train_log(self.train_scores, overall_start_time, last_log_time, local_steps_for_log)
-#
-#                         if self._run_tests:
-#                             test_scores = self.test(deterministic=self.deterministic_testing)
-#
-#                         if self.write_summaries:
-#                             train_summary = self._session.run(self._summaries,
-#                                                               {self.scores_placeholder: self.train_scores})
-#                             self._train_writer.add_summary(train_summary, global_steps)
-#                             if self._run_tests:
-#                                 test_summary = self._session.run(self._summaries,
-#                                                                  {self.scores_placeholder: test_scores})
-#                                 self._test_writer.add_summary(test_summary, global_steps)
-#
-#                         last_log_time = time.time()
-#                         local_steps_for_log = 0
-#
-#                         log("Learning rate: {}".format(self._session.run(self.learning_rate)))
-#
-#                         # Saves model
-#                         if self._epoch % self.save_interval == 0:
-#                             self.save_model()
-#
-#                         log("")
-#
-#                     self.train_scores = []
-#
-#         except (SignalException, ViZDoomUnexpectedExitException):
-#             threadsafe_print(red("Thread #{} aborting(ViZDoom killed).".format(self.thread_index)))
-#
-#     def _get_best_action_and_frameskip(self, sess, state, deterministic=True):
-#         q = self.local_network.get_q_values(sess, state).flatten()
-#         action_index = q.argmax()
-#         frameskip = None
-#         return action_index, frameskip
+        action_index = self.choose_best_index(policy, deterministic=deterministic)
+        if self.continuous_frameskip:
+            mu, sigma = frameskip_policy
+            frameskip = self.choose_best_frameskip_continuous(mu, sigma, deterministic=deterministic)
+        else:
+            frameskip_index = self.choose_best_index(frameskip_policy, deterministic=deterministic)
+            frameskip = self.frameskips[frameskip_index]
+        return action_index, frameskip
