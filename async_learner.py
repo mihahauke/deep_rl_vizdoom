@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import logging
-import os
 import sys
 import time
 from threading import Thread
@@ -19,9 +18,11 @@ from util.logger import log
 from util.misc import setup_vector_summaries
 from vizdoom_wrapper import VizdoomWrapper
 
+
 class A3CLearner(Thread):
     def __init__(self,
                  thread_index=0,
+                 model_savefile=None,
                  network_class="ACLstmNet",
                  global_steps_counter=None,
                  scenario_tag=None,
@@ -99,8 +100,7 @@ class A3CLearner(Thread):
             self.local_network.prepare_sync_op(global_network)
 
         if self.thread_index == 0 and not test_only:
-            self._model_savefile = settings["models_path"] + "/" + self.run_id_string
-
+            self._model_savefile = model_savefile
             if self.write_summaries:
                 self.scores_placeholder, summaries = setup_vector_summaries(scenario_tag + "/scores")
                 lr_summary = tf.summary.scalar(scenario_tag + "/learning_rate", self.learning_rate)
@@ -199,6 +199,7 @@ class A3CLearner(Thread):
             if return_stats:
                 actions.append(action_index)
                 frameskips.append(frameskip)
+
                 rewards.append(reward)
 
         total_reward = self.doom_wrapper.get_total_reward()
@@ -503,6 +504,7 @@ class FigarA3CLearner(A3CLearner):
                  dynamic_frameskips=None,
                  multi_frameskip=False,
                  cfigar=False,
+                 correct_gamma=False,
                  **args):
         if dynamic_frameskips is not None:
             self.continuous_frameskip = False
@@ -518,6 +520,7 @@ class FigarA3CLearner(A3CLearner):
         else:
             self.continuous_frameskip = True
             self.multi_frameskip = multi_frameskip
+        self.correct_gamma = correct_gamma
         super(FigarA3CLearner, self).__init__(dynamic_frameskips=dynamic_frameskips,
                                               multi_frameskip=multi_frameskip,
                                               **args)
@@ -571,9 +574,14 @@ class FigarA3CLearner(A3CLearner):
         else:
             R = self.local_network.get_value(self._session, self.doom_wrapper.get_current_state())
 
-        for ri in rewards_reversed:
-            R = ri + self.gamma * R
-            Rs.insert(0, R)
+        if self.correct_gamma:
+            for ri, fs in zip(rewards_reversed, reversed(frameskips)):
+                R = ri + self.gamma ** fs * R
+                Rs.insert(0, R)
+        else:
+            for ri in rewards_reversed:
+                R = ri + self.gamma * R
+                Rs.insert(0, R)
 
         train_op_feed_dict = {
             self.local_network.vars.state_img: states_img,
@@ -593,6 +601,14 @@ class FigarA3CLearner(A3CLearner):
 
     @staticmethod
     def choose_best_frameskip_continuous(mu, sigma, deterministic=True):
+        # Binomial test:
+        # if deterministic:
+        #
+        #     frameskip = int(mu*sigma)+1
+        # else:
+        #     frameskip = int(np.random.binomial(mu,sigma))+1
+        # return frameskip
+
         if deterministic:
             frameskip_float = mu
         else:
@@ -605,7 +621,6 @@ class FigarA3CLearner(A3CLearner):
         action_index = self.choose_best_index(policy, deterministic=deterministic)
         if self.continuous_frameskip:
             mu, sigma = frameskip_policy
-
             if self.multi_frameskip:
                 mu = mu[action_index]
                 sigma = sigma[action_index]

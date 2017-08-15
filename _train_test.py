@@ -12,6 +12,8 @@ from util.misc import load_settings, print_settings
 from util.parsers import parse_train_a3c_args, parse_test_a3c_args
 from util.parsers import parse_train_adqn_args, parse_test_adqn_args
 from util.parsers import parse_train_dqn_args, parse_test_dqn_args
+from util import ensure_parent_directories
+import ruamel.yaml as yaml
 
 
 def _test_common(args, settings):
@@ -31,6 +33,7 @@ def _test_common(args, settings):
 
 def _train_common(settings):
     run_id_string = "{}/{}".format(settings["network_class"], strftime(settings["date_format"]))
+
     if settings["run_tag"] is not None:
         run_id_string = str(settings["run_tag"]) + "/" + run_id_string
 
@@ -42,6 +45,15 @@ def _train_common(settings):
     print_settings(settings)
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(settings["tf_log_level"])
+    model_dir = os.path.join(settings["models_path"], run_id_string)
+    model_file = os.path.join(model_dir, "model")
+    settings_output_file = os.path.join(model_dir, "setings.yml")
+
+    ensure_parent_directories(settings_output_file)
+    log("Saving settings to: {}".format(settings_output_file))
+    yaml.safe_dump(settings, open(settings_output_file, "w"))
+
+    return model_file
 
 
 def train_dqn():
@@ -49,10 +61,10 @@ def train_dqn():
     settings = load_settings(DEFAULT_DQN_SETTINGS_FILE, args.settings_yml)
     if args.run_tag is not None:
         settings["run_tag"] = args.run_tag
-    _train_common(settings)
+        model_savefile = _train_common(settings)
 
     from _dqn_algo import DQN
-    dqn = DQN(**settings)
+    dqn = DQN(model_savefile=model_savefile, **settings)
 
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -67,10 +79,10 @@ def train_a3c():
     settings = load_settings(DEFAULT_A3C_SETTINGS_FILE, args.settings_yml)
     if args.run_tag is not None:
         settings["run_tag"] = args.run_tag
-    _train_common(settings)
+    model_savefile = _train_common(settings)
 
     from _async_algo import train_async
-    train_async(q_learning=False, settings=settings)
+    train_async(model_savefile=model_savefile, q_learning=False, settings=settings)
 
 
 def train_adqn():
@@ -78,14 +90,15 @@ def train_adqn():
     settings = load_settings(DEFAULT_ADQN_SETTINGS_FILE, args.settings_yml)
     if args.run_tag is not None:
         settings["run_tag"] = args.run_tag
-    _train_common(settings)
+    model_savefile = _train_common(settings)
 
     from _async_algo import train_async
-    train_async(q_learning=True, settings=settings)
+    train_async(model_savefile=model_savefile, q_learning=True, settings=settings)
 
 
 def test_dqn():
     args = parse_test_dqn_args()
+    # TODO load settings that are with the model
     settings = load_settings(DEFAULT_DQN_SETTINGS_FILE, args.settings_yml)
 
     _test_common(args, settings)
@@ -109,8 +122,10 @@ def test_dqn():
     log("\nMean score: {:0.3f}".format(np.mean(scores)))
     # TODO print scores to file
 
+
 def test_a3c():
     args = parse_test_a3c_args()
+    # TODO load settings that are with the model
     settings = load_settings(DEFAULT_A3C_SETTINGS_FILE, args.settings_yml)
     _test_common(args, settings)
 
@@ -125,6 +140,7 @@ def test_a3c():
 
 def test_adqn():
     args = parse_test_adqn_args()
+    # TODO load settings that are with the model
     settings = load_settings(DEFAULT_ADQN_SETTINGS_FILE, args.settings_yml)
     _test_common(args, settings)
 

@@ -1,6 +1,6 @@
 import os
 import threading
-from logging import log
+from .logger import log
 from threading import Lock
 
 

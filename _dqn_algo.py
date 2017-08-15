@@ -21,6 +21,7 @@ import networks
 class DQN(object):
     def __init__(self,
                  scenario_tag=None,
+                 model_savefile=None,
                  run_id_string=None,
                  network_class="DQNNet",
                  write_summaries=True,
@@ -83,7 +84,7 @@ class DQN(object):
 
         self.save_interval = save_interval
 
-        self._model_savefile = settings["models_path"] + "/" + self.run_id_string
+        self._model_savefile = model_savefile
         ## TODO move summaries somewhere so they are consistent between dqn and asyncs
         if self.write_summaries:
             assert tf_logdir is not None

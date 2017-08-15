@@ -16,7 +16,7 @@ from util.optimizers import ClippingRMSPropOptimizer
 from vizdoom_wrapper import VizdoomWrapper
 
 
-def train_async(q_learning, settings):
+def train_async(model_savefile, q_learning, settings):
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     session = tf.Session(config=config)
@@ -54,7 +54,8 @@ def train_async(q_learning, settings):
         global_network.prepare_unfreeze_op(global_target_network)
         unfreeze_thread = min(1, settings["threads_num"] - 1)
         for i in range(settings["threads_num"]):
-            learner = async_learner.ADQNLearner(thread_index=i, global_network=global_network,
+            learner = async_learner.ADQNLearner(model_savefile=model_savefile,
+                                                thread_index=i, global_network=global_network,
                                                 unfreeze_thread=i == unfreeze_thread,
                                                 global_target_network=global_target_network,
                                                 optimizer=optimizer,
@@ -66,8 +67,11 @@ def train_async(q_learning, settings):
 
         for i in range(settings["threads_num"]):
             LearnerClass = getattr(async_learner, settings["learner_class"])
-            learner = LearnerClass(thread_index=i, global_network=global_network,
-                                   optimizer=optimizer, learning_rate=global_learning_rate,
+            learner = LearnerClass(model_savefile=model_savefile,
+                                   thread_index=i,
+                                   global_network=global_network,
+                                   optimizer=optimizer,
+                                   learning_rate=global_learning_rate,
                                    global_steps_counter=global_steps_counter,
                                    **settings)
             learners.append(learner)
@@ -115,17 +119,24 @@ def test_async(q_learning, settings, modelfile, eps, deterministic=True, output=
              "frameskips": []}
 
     for _ in range(eps):
-        score, rewards, actions, frameskips = agent.run_episode(deterministic=deterministic, return_stats=True)
+        score, actions, frameskips, rewards = agent.run_episode(deterministic=deterministic, return_stats=True)
         scores.append(score)
         print("{0:3f}".format(score))
         if output is not None:
-            episode_stats = {"score": score, "rewards": rewards, "frameskips": frameskips, "actions": actions}
+            episode_stats = {"score": score,
+                             "rewards": rewards,
+                             "actions": actions,
+                             "frameskips": frameskips}
             stats["actions"] += actions
             stats["frameskips"] += frameskips
             stats["episodes"].append(episode_stats)
+
     print()
     log("\nMean score: {:0.3f}".format(np.mean(scores)))
 
     if output is not None:
+        stats["actions"] = np.array(stats["actions"], dtype=np.int16)
+        stats["frameskips"] = np.array(stats["frameskips"], dtype=np.int16)
+
         ensure_parent_directories(output)
         pickle.dump(stats, open(output, "wb"))

@@ -71,7 +71,7 @@ def _create_test_parser(description):
                         help="If window is visible, tests will be run with given framerate."
                         )
     parser.add_argument("--agent-view",
-                        "-aw",
+                        "-av",
                         dest="agent_view",
                         action="store_const",
                         default=False,
@@ -98,7 +98,8 @@ def _create_test_parser(description):
                         dest="deterministic",
                         metavar="DETERMINISTIC",
                         default=1,
-                        choices=[0,1],
+                        type=int,
+                        choices=[0, 1],
                         help="If 1 dtests will be deterministic."
                         )
 
