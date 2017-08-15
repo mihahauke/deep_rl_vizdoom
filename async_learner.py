@@ -601,7 +601,7 @@ class FigarA3CLearner(A3CLearner):
 
     @staticmethod
     def choose_best_frameskip_continuous(mu, sigma, deterministic=True):
-        # Binomial test:
+        # # Binomial test:
         # if deterministic:
         #
         #     frameskip = int(mu*sigma)+1

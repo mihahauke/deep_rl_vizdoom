@@ -78,6 +78,7 @@ def train_async(model_savefile, q_learning, settings):
 
     log("Initializing variables...")
     session.run(tf.global_variables_initializer())
+    exit(0)
     log("Initialization finished.\n")
 
     if q_learning:

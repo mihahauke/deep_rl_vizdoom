@@ -427,6 +427,7 @@ class CFigarACLSTMNet(FigarACLSTMNet):
             self.ops.frameskip_variance = tf.reshape(self.ops.frameskip_variance, (-1,))
 
         self.ops.frameskip_sigma = tf.sqrt(self.ops.frameskip_variance, name="frameskip_sigma")
+        self.ops.frameskip_policy = [self.ops.frameskip_mu, self.ops.frameskip_sigma]
 
     def _prepare_loss_op(self):
         self.vars.a = tf.placeholder(tf.int32, [None], name="action")
@@ -440,7 +441,6 @@ class CFigarACLSTMNet(FigarACLSTMNet):
         entropy = -tf.reduce_sum(self.ops.pi * log_pi)
         chosen_pi_log = gather_2d(log_pi, self.vars.a)
 
-        pi = tf.constant(math.pi, name="Pie")
         if self.multi_frameskip:
             fs_mu = gather_2d(self.ops.frameskip_mu, self.vars.a)
             fs_sigma = gather_2d(self.ops.frameskip_sigma, self.vars.a)
@@ -451,20 +451,118 @@ class CFigarACLSTMNet(FigarACLSTMNet):
         log_safe_sigma = tf.maximum(fs_sigma, 1e-20)
         normal_dist = tf.contrib.distributions.Normal(loc=fs_mu, scale=log_safe_sigma)
         fs_log_prob = normal_dist.log_prob(self.vars.frameskip)
-        fentropy = -0.5 * tf.reduce_sum(tf.log(2 * pi * fs_sigma) + 1)
+        fentropy = tf.reduce_sum(normal_dist.entropy(name="frameskip_entropy"))
 
         policy_loss = - tf.reduce_sum((chosen_pi_log + fs_log_prob) * constant_advantage)
         value_loss = 0.5 * tf.reduce_sum(advantage ** 2)
 
-        self.ops.debug = [fs_mu, fs_sigma, log_safe_sigma, fs_log_prob]
         self.ops.loss = policy_loss + value_loss - entropy * self._entropy_beta - fentropy * self._fentropy_beta
 
     def get_policy(self, sess, state, update_state=True):
-        pi, fs_mu, fs_sigma, new_network_state = sess.run([self.ops.pi,
-                                                           self.ops.frameskip_mu,
-                                                           self.ops.frameskip_sigma,
-                                                           self.ops.network_state],
-                                                          feed_dict=self.get_standard_feed_dict(state))
+        pi, fs_policy, new_network_state = sess.run([self.ops.pi,
+                                                     self.ops.frameskip_policy,
+                                                     self.ops.network_state],
+                                                    feed_dict=self.get_standard_feed_dict(state))
         if update_state:
             self.network_state = new_network_state
-        return pi[0], [fs_mu[0], fs_sigma[0]]
+        return pi[0], [fs_policy[0][0], fs_policy[1][0]]
+
+
+class BinomialFigarACLSTMNet(CFigarACLSTMNet):
+    def __init__(self,
+                 fs_n_bias=8,
+                 **settings
+                 ):
+
+        self.fs_n_bias = fs_n_bias
+        super(BinomialFigarACLSTMNet, self).__init__(**settings)
+
+    def create_architecture(self):
+        self.vars.sequence_length = tf.placeholder(tf.int64, [1], name="sequence_length")
+
+        fc_input = self.get_input_layers()
+
+        fc1 = layers.fully_connected(fc_input, num_outputs=self.fc_units_num,
+                                     scope=self._name_scope + "/fc1",
+                                     biases_initializer=tf.constant_initializer(0.1))
+
+        fc1_reshaped = tf.reshape(fc1, [1, -1, self.fc_units_num])
+        self.recurrent_cells = self.ru_class(self._recurrent_units_num)
+        state_c = tf.placeholder(tf.float32, [1, self.recurrent_cells.state_size.c], name="initial_lstm_state_c")
+        state_h = tf.placeholder(tf.float32, [1, self.recurrent_cells.state_size.h], name="initial_lstm_state_h")
+        self.vars.initial_network_state = LSTMStateTuple(state_c, state_h)
+        rnn_outputs, self.ops.network_state = tf.nn.dynamic_rnn(self.recurrent_cells,
+                                                                fc1_reshaped,
+                                                                initial_state=self.vars.initial_network_state,
+                                                                sequence_length=self.vars.sequence_length,
+                                                                time_major=False,
+                                                                scope=self._name_scope)
+        reshaped_rnn_outputs = tf.reshape(rnn_outputs, [-1, self._recurrent_units_num])
+
+        self.reset_state()
+
+        self.ops.pi = layers.fully_connected(reshaped_rnn_outputs,
+                                             num_outputs=self.actions_num,
+                                             scope=self._name_scope + "/fc_pi",
+                                             activation_fn=tf.nn.softmax)
+
+        state_value = layers.linear(reshaped_rnn_outputs,
+                                    num_outputs=1,
+                                    scope=self._name_scope + "/fc_value")
+
+        self.ops.v = tf.reshape(state_value, [-1])
+
+        if self.multi_frameskip:
+            frameskip_output_len = self.actions_num
+        else:
+            frameskip_output_len = 1
+
+        if self.fs_stop_gradient:
+            reshaped_rnn_outputs = tf.stop_gradient(reshaped_rnn_outputs)
+
+        self.ops.frameskip_n = 1 + layers.fully_connected(reshaped_rnn_outputs,
+                                                          num_outputs=frameskip_output_len,
+                                                          scope=self._name_scope + "/fc_frameskip_n",
+                                                          activation_fn=tf.nn.relu,
+                                                          biases_initializer=tf.constant_initializer(self.fs_n_bias))
+
+        self.ops.frameskip_p = layers.fully_connected(reshaped_rnn_outputs,
+                                                      num_outputs=frameskip_output_len,
+                                                      scope=self._name_scope + "/fc_frameskip_p",
+                                                      biases_initializer=tf.constant_initializer(0))
+        if not self.multi_frameskip:
+            self.ops.frameskip_n = tf.reshape(self.ops.frameskip_n, (-1,))
+            self.ops.frameskip_p = tf.reshape(self.ops.frameskip_p, (-1,))
+
+        self.ops.frameskip_policy = [self.ops.frameskip_n, self.ops.frameskip_p]
+
+    def _prepare_loss_op(self):
+        self.vars.a = tf.placeholder(tf.int32, [None], name="action")
+        self.vars.R = tf.placeholder(tf.float32, [None], name="R")
+        self.vars.frameskip = tf.placeholder(tf.float32, [None], name="frameskip")
+
+        advantage = self.vars.R - self.ops.v
+        constant_advantage = tf.stop_gradient(advantage, name="adventage_as_constant")
+
+        log_pi = tf.log(tf.clip_by_value(self.ops.pi, 1e-20, 1.0))
+        entropy = -tf.reduce_sum(self.ops.pi * log_pi)
+        chosen_pi_log = gather_2d(log_pi, self.vars.a)
+
+        if self.multi_frameskip:
+            fs_n = gather_2d(self.ops.frameskip_n, self.vars.a)
+            fs_p = gather_2d(self.ops.frameskip_p, self.vars.a)
+        else:
+            fs_n = self.ops.frameskip_n
+            fs_p = self.ops.frameskip_p
+
+        binomial_dist = tf.contrib.distributions.Binomial(total_count=fs_n, probs=fs_p)
+        fs_log_prob = binomial_dist.log_prob(self.vars.frameskip - 1)
+        # TODO not implemented in tf :(
+        # fentropy = tf.reduce_sum(binomial_dist.entropy(name="frameskip_entropy"))
+        pi = tf.constant(math.pi, name="Pie")
+        fentropy = 0.5 * tf.reduce_sum(tf.maximum(tf.log(2 * pi * fs_n * fs_p * (1 - fs_p)) + 1, 1e-20) + 1 / fs_n)
+
+        policy_loss = - tf.reduce_sum((chosen_pi_log + fs_log_prob) * constant_advantage)
+        value_loss = 0.5 * tf.reduce_sum(advantage ** 2)
+
+        self.ops.loss = policy_loss + value_loss - entropy * self._entropy_beta #- fentropy * self._fentropy_beta
