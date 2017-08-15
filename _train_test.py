@@ -1,18 +1,17 @@
 # -*- coding: utf-8 -*-
 
 import os
-import tensorflow as tf
 from time import strftime
 
+import numpy as np
+import tensorflow as tf
+
+from paths import *
 from util.logger import setup_file_logger, log
 from util.misc import load_settings, print_settings
-
-from util.parsers import parse_train_dqn_args, parse_test_dqn_args
 from util.parsers import parse_train_a3c_args, parse_test_a3c_args
 from util.parsers import parse_train_adqn_args, parse_test_adqn_args
-
-import numpy as np
-from paths import *
+from util.parsers import parse_train_dqn_args, parse_test_dqn_args
 
 
 def _test_common(args, settings):
@@ -31,9 +30,9 @@ def _test_common(args, settings):
 
 
 def _train_common(settings):
-    run_id_string = "{}/{}".format(strftime(settings["date_format"]), settings["network_class"])
+    run_id_string = "{}/{}".format(settings["network_class"], strftime(settings["date_format"]))
     if settings["run_tag"] is not None:
-        run_id_string += "/" + str(settings["run_tag"])
+        run_id_string = str(settings["run_tag"]) + "/" + run_id_string
 
     if settings["logdir"] is not None:
         logfile = os.path.join(settings["logdir"], settings["scenario_tag"] + "_" + run_id_string.replace("/", "_"))
@@ -108,7 +107,7 @@ def test_dqn():
         print("{0:3f}".format(reward))
     print()
     log("\nMean score: {:0.3f}".format(np.mean(scores)))
-
+    # TODO print scores to file
 
 def test_a3c():
     args = parse_test_a3c_args()
@@ -116,7 +115,12 @@ def test_a3c():
     _test_common(args, settings)
 
     from _async_algo import test_async
-    test_async(q_learning=False, settings=settings, modelfile=args.model, eps=args.episodes_num)
+    test_async(q_learning=False,
+               settings=settings,
+               modelfile=args.model,
+               eps=args.episodes_num,
+               deterministic=args.deterministic,
+               output=args.output)
 
 
 def test_adqn():
@@ -125,4 +129,9 @@ def test_adqn():
     _test_common(args, settings)
 
     from _async_algo import test_async
-    test_async(q_learning=True, settings=settings, modelfile=args.model, eps=args.episodes_num)
+    test_async(q_learning=True,
+               settings=settings,
+               modelfile=args.model,
+               eps=args.episodes_num,
+               deterministic=args.deterministic,
+               output=args.output)

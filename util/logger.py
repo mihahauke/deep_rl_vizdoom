@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import logging
 import os
-from time import strftime
 
 logging.basicConfig(format='%(message)s', level=logging.DEBUG)
 

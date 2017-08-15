@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from util.coloring import green
-import async_learner
-from util.logger import log
-from vizdoom_wrapper import VizdoomWrapper
-from util import ThreadsafeCounter
-from util.optimizers import ClippingRMSPropOptimizer
-import networks
-import tensorflow as tf
+import pickle
+
 import numpy as np
+import tensorflow as tf
+
+import async_learner
+import networks
+from util import ThreadsafeCounter
+from util import ensure_parent_directories
+from util.coloring import green
+from util.logger import log
+from util.optimizers import ClippingRMSPropOptimizer
+from vizdoom_wrapper import VizdoomWrapper
 
 
 def train_async(q_learning, settings):
@@ -35,7 +39,7 @@ def train_async(q_learning, settings):
 
     learners = []
     NetworkClass = getattr(networks, settings["network_class"])
-    
+
     global_network = NetworkClass(actions_num=actions_num,
                                   misc_len=misc_len,
                                   img_shape=img_shape,
@@ -83,7 +87,7 @@ def train_async(q_learning, settings):
         l.join()
 
 
-def test_async(q_learning, settings, modelfile, eps, deterministic=True):
+def test_async(q_learning, settings, modelfile, eps, deterministic=True, output=None):
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     session = tf.InteractiveSession(config=config)
@@ -106,9 +110,22 @@ def test_async(q_learning, settings, modelfile, eps, deterministic=True):
     log("\nScores: ")
     scores = []
 
+    stats = {"episodes": [],
+             "actions": [],
+             "frameskips": []}
+
     for _ in range(eps):
-        reward = agent.run_episode(deterministic=deterministic)
-        scores.append(reward)
-        print("{0:3f}".format(reward))
+        score, rewards, actions, frameskips = agent.run_episode(deterministic=deterministic, return_stats=True)
+        scores.append(score)
+        print("{0:3f}".format(score))
+        if output is not None:
+            episode_stats = {"score": score, "rewards": rewards, "frameskips": frameskips, "actions": actions}
+            stats["actions"] += actions
+            stats["frameskips"] += frameskips
+            stats["episodes"].append(episode_stats)
     print()
     log("\nMean score: {:0.3f}".format(np.mean(scores)))
+
+    if output is not None:
+        ensure_parent_directories(output)
+        pickle.dump(stats, open(output, "wb"))

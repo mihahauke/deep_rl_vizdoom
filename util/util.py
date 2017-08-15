@@ -1,6 +1,7 @@
-from __future__ import print_function
-from threading import Lock
+import os
 import threading
+from logging import log
+from threading import Lock
 
 
 def sec_to_str(sec):
@@ -42,3 +43,14 @@ class Record(object):
     pass
 
 
+def create_directory(directory):
+    if not os.path.exists(directory):
+        log("Creating directory: {}".format(directory))
+        os.makedirs(directory)
+
+
+def ensure_parent_directories(filename):
+    directory = os.path.dirname(filename)
+    if not os.path.exists(directory):
+        log("Creating directory: {}".format(directory))
+        os.makedirs(directory)

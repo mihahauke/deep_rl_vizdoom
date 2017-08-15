@@ -11,7 +11,7 @@ import os
 from replay_memory import ReplayMemory
 from time import time
 from util.coloring import red, green, blue
-from util import sec_to_str
+from util import sec_to_str, create_directory, ensure_parent_directories
 from util.logger import log
 from util.misc import setup_vector_summaries
 import sys
@@ -87,8 +87,7 @@ class DQN(object):
         ## TODO move summaries somewhere so they are consistent between dqn and asyncs
         if self.write_summaries:
             assert tf_logdir is not None
-            if not os.path.isdir(tf_logdir):
-                os.makedirs(tf_logdir)
+            create_directory(tf_logdir)
 
             self.scores_placeholder, summaries = setup_vector_summaries(scenario_tag + "/scores")
             self._summaries = tf.summary.merge(summaries)
@@ -147,10 +146,7 @@ class DQN(object):
     def save_model(self, session, savefile=None):
         if savefile is None:
             savefile = self._model_savefile
-        savedir = os.path.dirname(savefile)
-        if not os.path.exists(savedir):
-            log("Creating directory: {}".format(savedir))
-            os.makedirs(savedir)
+        ensure_parent_directories(savefile)
         log("Saving model to: {}".format(savefile))
         saver = tf.train.Saver()
         saver.save(session, savefile)
@@ -244,16 +240,9 @@ class DQN(object):
                 if self._run_tests:
                     test_summary = session.run(self._summaries, {self.scores_placeholder: test_scores})
                     self._test_writer.add_summary(test_summary, self.steps)
-
             # Save model
             if self._epoch % self.save_interval == 0:
-                savedir = os.path.dirname(self._model_savefile)
-                if not os.path.exists(savedir):
-                    log("Creating directory: {}".format(savedir))
-                    os.makedirs(savedir)
-                log("Saving model to: {}".format(self._model_savefile))
-                saver = tf.train.Saver()
-                saver.save(session, self._model_savefile)
+                self.save_model()
 
             overall_time = time() - overall_start_time
             log("Total elapsed time: {}\n".format(sec_to_str(overall_time)))

@@ -64,7 +64,7 @@ def _create_test_parser(description):
                         const=True,
                         help="Print settings upon loading."
                         )
-    parser.add_argument("-fps",
+    parser.add_argument("--fps",
                         dest="fps",
                         metavar="FRAMERATE",
                         default=35,
@@ -85,6 +85,21 @@ def _create_test_parser(description):
                         default=None,
                         type=int,
                         help="Seed for ViZDoom."
+                        )
+    parser.add_argument("-o",
+                        "--output",
+                        dest="output",
+                        metavar="STATS_OUTPUT_FILE",
+                        default=None,
+                        help="File for output of stats"
+                        )
+    parser.add_argument("--deterministic",
+                        "-d",
+                        dest="deterministic",
+                        metavar="DETERMINISTIC",
+                        default=1,
+                        choices=[0,1],
+                        help="If 1 dtests will be deterministic."
                         )
 
     return parser

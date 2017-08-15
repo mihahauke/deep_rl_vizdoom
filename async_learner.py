@@ -1,22 +1,23 @@
 # -*- coding: utf-8 -*-
 
-import numpy as np
-import random
-import time
-from tqdm import trange
-from threading import Thread
-from util.coloring import red, green, blue, yellow
-import tensorflow as tf
-import sys
+import logging
 import os
+import sys
+import time
+from threading import Thread
+
+import numpy as np
+import tensorflow as tf
+from tqdm import trange
 from vizdoom import SignalException, ViZDoomUnexpectedExitException
-from util import sec_to_str, threadsafe_print
-from vizdoom_wrapper import VizdoomWrapper
+
+import networks
+import random
+from util import sec_to_str, threadsafe_print, ensure_parent_directories, create_directory
+from util.coloring import red, green, blue, yellow
 from util.logger import log
 from util.misc import setup_vector_summaries
-import networks
-import logging
-
+from vizdoom_wrapper import VizdoomWrapper
 
 class A3CLearner(Thread):
     def __init__(self,
@@ -69,12 +70,10 @@ class A3CLearner(Thread):
             assert tf_logdir is not None
             self.run_id_string = run_id_string
             self.tf_models_path = settings["models_path"]
-            if not os.path.isdir(tf_logdir):
-                os.makedirs(tf_logdir)
+            create_directory(tf_logdir)
 
             if self.tf_models_path is not None:
-                if not os.path.isdir(settings["models_path"]):
-                    os.makedirs(settings["models_path"])
+                create_directory(self.tf_models_path)
 
         self.doom_wrapper = VizdoomWrapper(**settings)
         misc_len = self.doom_wrapper.misc_len
@@ -113,7 +112,7 @@ class A3CLearner(Thread):
                                                           flush_secs=writer_flush_secs, max_queue=writer_max_queue)
 
     @staticmethod
-    def choose_best_index(policy, deterministic=False):
+    def choose_best_index(policy, deterministic=True):
         if deterministic:
             return np.argmax(policy)
 
@@ -131,7 +130,6 @@ class A3CLearner(Thread):
         states_misc = []
         actions = []
         rewards_reversed = []
-        values_reversed = []
         Rs = []
 
         self._session.run(self.local_network.ops.sync)
@@ -144,15 +142,14 @@ class A3CLearner(Thread):
         steps_performed = 0
         for _ in range(self.max_remembered_steps):
             steps_performed += 1
-            current_img, current_misc = self.doom_wrapper.get_current_state()
-            policy = self.local_network.get_policy(self._session, [current_img, current_misc])
-            action_index = A3CLearner.choose_best_index(policy)
-            states_img.append(current_img)
-            states_misc.append(current_misc)
+            current_state = self.doom_wrapper.get_current_state()
+            policy = self.local_network.get_policy(self._session, current_state)
+            action_index = A3CLearner.choose_best_index(policy, deterministic=False)
+            states_img.append(current_state[0])
+            states_misc.append(current_state[1])
             actions.append(action_index)
             reward = self.doom_wrapper.make_action(action_index)
             terminal = self.doom_wrapper.is_terminal()
-
             rewards_reversed.insert(0, reward)
             self.local_steps += 1
             if terminal:
@@ -188,17 +185,27 @@ class A3CLearner(Thread):
 
         return steps_performed
 
-    def run_episode(self, deterministic=True):
+    def run_episode(self, deterministic=True, return_stats=False):
         self.doom_wrapper.reset()
         if self.local_network.has_state():
             self.local_network.reset_state()
+        actions = []
+        frameskips = []
+        rewards = []
         while not self.doom_wrapper.is_terminal():
             current_state = self.doom_wrapper.get_current_state()
             action_index, frameskip = self._get_best_action(self._session, current_state, deterministic=deterministic)
-            self.doom_wrapper.make_action(action_index, frameskip)
+            reward = self.doom_wrapper.make_action(action_index, frameskip)
+            if return_stats:
+                actions.append(action_index)
+                frameskips.append(frameskip)
+                rewards.append(reward)
 
         total_reward = self.doom_wrapper.get_total_reward()
-        return total_reward
+        if return_stats:
+            return total_reward, actions, frameskips, rewards
+        else:
+            return total_reward
 
     def test(self, episodes_num=None, deterministic=True):
         if episodes_num is None:
@@ -303,10 +310,7 @@ class A3CLearner(Thread):
         self.start()
 
     def save_model(self):
-        savedir = os.path.dirname(self._model_savefile)
-        if not os.path.exists(savedir):
-            log("Creating directory: {}".format(savedir))
-            os.makedirs(savedir)
+        ensure_parent_directories(self._model_savefile)
         log("Saving model to: {}".format(self._model_savefile))
         saver = tf.train.Saver(self.local_network.get_params())
         saver.save(self._session, self._model_savefile)
@@ -497,6 +501,7 @@ class ADQNLearner(A3CLearner):
 class FigarA3CLearner(A3CLearner):
     def __init__(self,
                  dynamic_frameskips=None,
+                 multi_frameskip=False,
                  cfigar=False,
                  **args):
         if dynamic_frameskips is not None:
@@ -507,11 +512,15 @@ class FigarA3CLearner(A3CLearner):
                 self.frameskips = list(dynamic_frameskips)
             elif isinstance(dynamic_frameskips, int):
                 self.frameskips = list(range(1, dynamic_frameskips + 1))
+            self.frameskips_indices = {f: i for i, f in enumerate(self.frameskips)}
         elif not cfigar:
             raise ValueError()
         else:
             self.continuous_frameskip = True
-        super(FigarA3CLearner, self).__init__(dynamic_frameskips=dynamic_frameskips, **args)
+            self.multi_frameskip = multi_frameskip
+        super(FigarA3CLearner, self).__init__(dynamic_frameskips=dynamic_frameskips,
+                                              multi_frameskip=multi_frameskip,
+                                              **args)
 
     def make_training_step(self):
         # TODO mostly coppied, just added frameskip, a bit wasteful (maybe merge it with basic learner after all...)
@@ -530,31 +539,24 @@ class FigarA3CLearner(A3CLearner):
 
         terminal = None
         steps_performed = 0
+        # TODO changed compared to base:
         for _ in range(self.max_remembered_steps):
             steps_performed += 1
-            current_img, current_misc = self.doom_wrapper.get_current_state()
-            action_policy, frameskip_policy = self.local_network.get_policy(self._session,
-                                                                            [current_img,
-                                                                             current_misc])
+            current_state = self.doom_wrapper.get_current_state()
+            action_index, frameskip = self._get_best_action(self._session, current_state, deterministic=False)
             if self.continuous_frameskip:
-                mu, sigma = frameskip_policy
-                frameskip = self.choose_best_frameskip_continuous(mu, sigma)
                 frameskips.append(frameskip)
             else:
-                frameskip_index = self.choose_best_index(frameskip_policy, deterministic=False)
-                frameskip = self.frameskips[frameskip_index]
-                frameskips.append(frameskip_index)
-
-            action_index = self.choose_best_index(action_policy, deterministic=False)
-
-            states_img.append(current_img)
-            states_misc.append(current_misc)
-            actions.append(action_index)
+                frameskips.append(self.frameskips_indices[frameskip])
 
             reward = self.doom_wrapper.make_action(action_index, frameskip)
             terminal = self.doom_wrapper.is_terminal()
 
             rewards_reversed.insert(0, reward)
+            states_img.append(current_state[0])
+            states_misc.append(current_state[1])
+            actions.append(action_index)
+            # TODO end (and frameskip in feeddict)
             self.local_steps += 1
             if terminal:
                 if self.thread_index == 0:
@@ -578,7 +580,6 @@ class FigarA3CLearner(A3CLearner):
             self.local_network.vars.a: actions,
             self.local_network.vars.frameskip: frameskips,
             self.local_network.vars.R: Rs
-
         }
         if self.use_misc:
             train_op_feed_dict[self.local_network.vars.state_misc] = states_misc
@@ -588,16 +589,15 @@ class FigarA3CLearner(A3CLearner):
             train_op_feed_dict[self.local_network.vars.sequence_length] = [len(actions)]
 
         self._session.run(self.train_op, feed_dict=train_op_feed_dict)
-
         return steps_performed
 
     @staticmethod
-    def choose_best_frameskip_continuous(mu, sigma, deterministic=False):
+    def choose_best_frameskip_continuous(mu, sigma, deterministic=True):
         if deterministic:
             frameskip_float = mu
         else:
             frameskip_float = np.random.normal(mu, sigma)
-        frameskip = max(1, round(frameskip_float))
+        frameskip = int(max(1, round(frameskip_float)))
         return frameskip
 
     def _get_best_action(self, sess, state, deterministic=True):
@@ -605,6 +605,10 @@ class FigarA3CLearner(A3CLearner):
         action_index = self.choose_best_index(policy, deterministic=deterministic)
         if self.continuous_frameskip:
             mu, sigma = frameskip_policy
+
+            if self.multi_frameskip:
+                mu = mu[action_index]
+                sigma = sigma[action_index]
             frameskip = self.choose_best_frameskip_continuous(mu, sigma, deterministic=deterministic)
         else:
             frameskip_index = self.choose_best_index(frameskip_policy, deterministic=deterministic)
