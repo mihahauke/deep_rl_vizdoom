@@ -36,7 +36,6 @@ def train_async(model_savefile, q_learning, settings):
         decay_steps=settings["learning_rate_decay_steps"],
         global_step=global_train_step)
     optimizer = ClippingRMSPropOptimizer(learning_rate=global_learning_rate, **settings["rmsprop"])
-
     learners = []
     NetworkClass = getattr(networks, settings["network_class"])
 
@@ -78,7 +77,6 @@ def train_async(model_savefile, q_learning, settings):
 
     log("Initializing variables...")
     session.run(tf.global_variables_initializer())
-    exit(0)
     log("Initialization finished.\n")
 
     if q_learning:

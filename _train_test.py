@@ -134,7 +134,7 @@ def test_a3c():
                settings=settings,
                modelfile=args.model,
                eps=args.episodes_num,
-               deterministic=args.deterministic,
+               deterministic=bool(args.deterministic),
                output=args.output)
 
 

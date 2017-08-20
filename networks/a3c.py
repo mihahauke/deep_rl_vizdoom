@@ -345,27 +345,29 @@ class FigarACLSTMNet(FigarACFFNet):
 class CFigarACLSTMNet(FigarACLSTMNet):
     def __init__(self,
                  multi_frameskip=False,
-                 initial_fentropy_beta=0.0001,
-                 final_fentropy_beta=0.0,
-                 entropy_beta_decay_steps=10e6,
+                 initial_fsentropy_beta=0.0001,
+                 final_fsentropy_beta=0.0,
+                 fsentropy_beta_decay_steps=10e6,
                  fs_simga_bias=1,
                  fs_mu_bias=3,
                  **settings
                  ):
         self.multi_frameskip = multi_frameskip
-        if initial_fentropy_beta == final_fentropy_beta:
-            self._fentropy_beta = initial_fentropy_beta
+        if initial_fsentropy_beta == final_fsentropy_beta:
+            self._fsentropy_beta = initial_fsentropy_beta
+        elif initial_fsentropy_beta == 0:
+            self._fsentropy_beta = 0
         else:
-            self._fentropy_beta = tf.train.polynomial_decay(
+            self._fsentropy_beta = tf.train.polynomial_decay(
                 name="frameskip_entropy_beta",
-                learning_rate=initial_fentropy_beta,
-                end_learning_rate=final_fentropy_beta,
-                decay_steps=entropy_beta_decay_steps,
+                learning_rate=initial_fsentropy_beta,
+                end_learning_rate=final_fsentropy_beta,
+                decay_steps=fsentropy_beta_decay_steps,
                 global_step=tf.train.get_global_step())
 
         self.fs_sigma_bias = fs_simga_bias
         self.fs_mu_bias = fs_mu_bias
-        super(CFigarACLSTMNet, self).__init__(entropy_beta_decay_steps=entropy_beta_decay_steps, **settings)
+        super(CFigarACLSTMNet, self).__init__(**settings)
 
     def create_architecture(self):
         self.vars.sequence_length = tf.placeholder(tf.int64, [1], name="sequence_length")
@@ -451,12 +453,12 @@ class CFigarACLSTMNet(FigarACLSTMNet):
         log_safe_sigma = tf.maximum(fs_sigma, 1e-20)
         normal_dist = tf.contrib.distributions.Normal(loc=fs_mu, scale=log_safe_sigma)
         fs_log_prob = normal_dist.log_prob(self.vars.frameskip)
-        fentropy = tf.reduce_sum(normal_dist.entropy(name="frameskip_entropy"))
+        fsentropy = tf.reduce_sum(normal_dist.entropy(name="frameskip_entropy"))
 
         policy_loss = - tf.reduce_sum((chosen_pi_log + fs_log_prob) * constant_advantage)
         value_loss = 0.5 * tf.reduce_sum(advantage ** 2)
 
-        self.ops.loss = policy_loss + value_loss - entropy * self._entropy_beta - fentropy * self._fentropy_beta
+        self.ops.loss = policy_loss + value_loss - entropy * self._entropy_beta - fsentropy * self._fsentropy_beta
 
     def get_policy(self, sess, state, update_state=True):
         pi, fs_policy, new_network_state = sess.run([self.ops.pi,
@@ -471,10 +473,12 @@ class CFigarACLSTMNet(FigarACLSTMNet):
 class BinomialFigarACLSTMNet(CFigarACLSTMNet):
     def __init__(self,
                  fs_n_bias=8,
+                 fs_p_bias=0,
                  **settings
                  ):
 
         self.fs_n_bias = fs_n_bias
+        self.fs_p_bias = fs_p_bias
         super(BinomialFigarACLSTMNet, self).__init__(**settings)
 
     def create_architecture(self):
@@ -529,7 +533,10 @@ class BinomialFigarACLSTMNet(CFigarACLSTMNet):
         self.ops.frameskip_p = layers.fully_connected(reshaped_rnn_outputs,
                                                       num_outputs=frameskip_output_len,
                                                       scope=self._name_scope + "/fc_frameskip_p",
-                                                      biases_initializer=tf.constant_initializer(0))
+                                                      activation_fn=tf.nn.sigmoid,
+                                                      biases_initializer=tf.constant_initializer(self.fs_p_bias))
+        eps = 1e-20
+        self.ops.frameskip_p = tf.clip_by_value(self.ops.frameskip_p, eps, 1 - eps)
         if not self.multi_frameskip:
             self.ops.frameskip_n = tf.reshape(self.ops.frameskip_n, (-1,))
             self.ops.frameskip_p = tf.reshape(self.ops.frameskip_p, (-1,))
@@ -559,10 +566,9 @@ class BinomialFigarACLSTMNet(CFigarACLSTMNet):
         fs_log_prob = binomial_dist.log_prob(self.vars.frameskip - 1)
         # TODO not implemented in tf :(
         # fentropy = tf.reduce_sum(binomial_dist.entropy(name="frameskip_entropy"))
-        pi = tf.constant(math.pi, name="Pie")
-        fentropy = 0.5 * tf.reduce_sum(tf.maximum(tf.log(2 * pi * fs_n * fs_p * (1 - fs_p)) + 1, 1e-20) + 1 / fs_n)
+        pie = tf.constant(math.pi, name="Pie")
+        fsentropy = 0.5 * tf.reduce_sum(tf.maximum(tf.log(2 * pie * fs_n * fs_p * (1 - fs_p)) + 1, 1e-20) + 1 / fs_n)
 
         policy_loss = - tf.reduce_sum((chosen_pi_log + fs_log_prob) * constant_advantage)
         value_loss = 0.5 * tf.reduce_sum(advantage ** 2)
-
-        self.ops.loss = policy_loss + value_loss - entropy * self._entropy_beta #- fentropy * self._fentropy_beta
+        self.ops.loss = policy_loss + value_loss - entropy * self._entropy_beta - fsentropy * self._fsentropy_beta

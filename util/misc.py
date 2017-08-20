@@ -19,9 +19,12 @@ def setup_vector_summaries(name_prefix):
     summary_std = tf.summary.scalar(name_prefix + "/std", scores_std)
     summary_min = tf.summary.scalar(name_prefix + "/min", scores_min)
     summary_max = tf.summary.scalar(name_prefix + "/max", scores_max)
+    summary_hist = tf.summary.histogram(name_prefix, placeholder)
 
-    summaries = [summary_mean, summary_std, summary_min, summary_max]
+    summaries = [summary_mean, summary_std, summary_min, summary_max, summary_hist]
     return placeholder, summaries
+
+
 
 
 def print_settings(settings, level=1, indent="    ", end_with_newline=True):
