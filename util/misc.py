@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 
 from paths import *
-import ruamel.yaml as yaml
+import ruamel.yaml
 from .logger import log
+from .coloring import red
 
 import tensorflow as tf
 
@@ -22,8 +23,6 @@ def setup_vector_summaries(name_prefix):
 
     summaries = [summary_mean, summary_std, summary_min, summary_max]
     return placeholder, summaries
-
-
 
 
 def print_settings(settings, level=1, indent="    ", end_with_newline=True):
@@ -47,13 +46,22 @@ def print_settings(settings, level=1, indent="    ", end_with_newline=True):
 
 def load_settings(default_settings_file, override_settings_files):
     log("Loading common default settings from: " + DEFAULT_COMMON_SETTINGS_FILE)
-    settings = yaml.safe_load(open(DEFAULT_COMMON_SETTINGS_FILE))
-    log("Loading default settings from: " + default_settings_file)
-    settings.update(yaml.safe_load(open(default_settings_file)))
+    yaml = ruamel.yaml.YAML()
+    yaml.allow_duplicate_keys = False
 
-    for settings_fpath in override_settings_files:
-        log("Loading settings from: " + settings_fpath)
-        override_settings = yaml.safe_load(open(settings_fpath))
-        settings.update(override_settings)
-    print("Loaded settings.")
+    try:
+        settings = yaml.load(open(DEFAULT_COMMON_SETTINGS_FILE))
+        log("Loading default settings from: " + default_settings_file)
+        settings.update(yaml.load(open(default_settings_file)))
+
+        for settings_fpath in override_settings_files:
+            log("Loading settings from: " + settings_fpath)
+            override_settings = yaml.load(open(settings_fpath))
+            settings.update(override_settings)
+        log("Loaded settings.")
+    except ruamel.yaml.constructor.DuplicateKeyError as ex:
+        log(red(ex))
+        log(red("Aborting!"))
+        exit(1)
+
     return settings

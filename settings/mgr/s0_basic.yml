@@ -9,5 +9,5 @@ misc_scale: [0.01]
 epochs: 200
 local_steps_per_epoch: 4000
 test_episodes_per_epoch: 100
-test_interval: 10
+test_interval: 1
 decay_steps: 1e5

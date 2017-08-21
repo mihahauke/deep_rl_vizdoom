@@ -15,12 +15,11 @@ max_remembered_steps: 20
 
 initial_learning_rate: 0.00008
 final_learning_rate: 0.00001
-learning_rate_decay_steps: 10e06
+decay_steps: 10e06
 gamma: 0.99
 
 initial_entropy_beta: 0.05
 final_entropy_beta: 0.0
-entropy_beta_decay_steps: 10e06
 # RMSProp
 rmsprop:
   decay: 0.99
