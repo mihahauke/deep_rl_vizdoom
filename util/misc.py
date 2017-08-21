@@ -45,12 +45,11 @@ def print_settings(settings, level=1, indent="    ", end_with_newline=True):
 
 
 def load_settings(default_settings_file, override_settings_files):
-    log("Loading common default settings from: " + DEFAULT_COMMON_SETTINGS_FILE)
     yaml = ruamel.yaml.YAML()
     yaml.allow_duplicate_keys = False
-
     try:
-        settings = yaml.load(open(DEFAULT_COMMON_SETTINGS_FILE))
+        log("Loading common default settings from: " + DEFAULT_COMMON_SETTINGS_FILE)
+        settings = dict(yaml.load(open(DEFAULT_COMMON_SETTINGS_FILE)))
         log("Loading default settings from: " + default_settings_file)
         settings.update(yaml.load(open(default_settings_file)))
 
