@@ -13,7 +13,7 @@ from util.parsers import parse_train_a3c_args, parse_test_a3c_args
 from util.parsers import parse_train_adqn_args, parse_test_adqn_args
 from util.parsers import parse_train_dqn_args, parse_test_dqn_args
 from util import ensure_parent_directories
-import ruamel.yaml as yaml
+import ruamel.yaml
 
 
 def _test_common(args, settings):
@@ -51,8 +51,8 @@ def _train_common(settings):
 
     ensure_parent_directories(settings_output_file)
     log("Saving settings to: {}".format(settings_output_file))
-    yaml.safe_dump(settings, open(settings_output_file, "w"))
-
+    ruamel.yaml.YAML().dump(settings, open(settings_output_file, "w"))
+    
     return model_file
 
 
