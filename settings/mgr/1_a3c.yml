@@ -1,0 +1,8 @@
+run_tag: a3c
+
+rmsprop:
+  decay: 0.99
+  momentum: 0.0
+  clip_norm: 0.0
+
+frameskip: 10

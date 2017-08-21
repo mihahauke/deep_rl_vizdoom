@@ -1,0 +1,13 @@
+config_file: health_gathering_supreme.cfg
+scenarios_path: ../benchmark_scenarios/scenarios
+scenario_tag: healthgathering_supreme
+reward_scale: 0.01
+misc_scale: [0.01]
+use_misc: True
+
+###########################################################
+epochs: 200
+local_steps_per_epoch: 8000
+test_episodes_per_epoch: 100
+test_interval: 10
+decay_steps: 1e5

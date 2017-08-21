@@ -15,7 +15,7 @@ class _BaseACNet(_BaseNetwork):
     def __init__(self,
                  initial_entropy_beta=0.05,
                  final_entropy_beta=0.0,
-                 entropy_beta_decay_steps=10e6,
+                 decay_steps=1e5,
                  thread="global",
                  **settings):
 
@@ -30,7 +30,7 @@ class _BaseACNet(_BaseNetwork):
                 name="entropy_beta",
                 learning_rate=initial_entropy_beta,
                 end_learning_rate=final_entropy_beta,
-                decay_steps=entropy_beta_decay_steps,
+                decay_steps=decay_steps,
                 global_step=tf.train.get_global_step())
 
         with arg_scope([layers.conv2d], data_format="NCHW"), \
@@ -347,7 +347,7 @@ class CFigarACLSTMNet(FigarACLSTMNet):
                  multi_frameskip=False,
                  initial_fsentropy_beta=0.0001,
                  final_fsentropy_beta=0.0,
-                 fsentropy_beta_decay_steps=10e6,
+                 decay_steps=1e5,
                  fs_simga_bias=1,
                  fs_mu_bias=3,
                  **settings
@@ -362,12 +362,12 @@ class CFigarACLSTMNet(FigarACLSTMNet):
                 name="frameskip_entropy_beta",
                 learning_rate=initial_fsentropy_beta,
                 end_learning_rate=final_fsentropy_beta,
-                decay_steps=fsentropy_beta_decay_steps,
+                decay_steps=decay_steps,
                 global_step=tf.train.get_global_step())
 
         self.fs_sigma_bias = fs_simga_bias
         self.fs_mu_bias = fs_mu_bias
-        super(CFigarACLSTMNet, self).__init__(**settings)
+        super(CFigarACLSTMNet, self).__init__(decay_steps=decay_steps, **settings)
 
     def create_architecture(self):
         self.vars.sequence_length = tf.placeholder(tf.int64, [1], name="sequence_length")

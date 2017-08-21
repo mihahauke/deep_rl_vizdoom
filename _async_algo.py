@@ -33,7 +33,7 @@ def train_async(model_savefile, q_learning, settings):
         name="larning_rate",
         learning_rate=settings["initial_learning_rate"],
         end_learning_rate=settings["final_learning_rate"],
-        decay_steps=settings["learning_rate_decay_steps"],
+        decay_steps=settings["decay_steps"],
         global_step=global_train_step)
     optimizer = ClippingRMSPropOptimizer(learning_rate=global_learning_rate, **settings["rmsprop"])
     learners = []

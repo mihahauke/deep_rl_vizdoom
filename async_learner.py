@@ -33,6 +33,7 @@ class A3CLearner(Thread):
                  optimizer=None,
                  learning_rate=None,
                  test_only=False,
+                 test_interval=1,
                  write_summaries=True,
                  enable_progress_bar=True,
                  deterministic_testing=True,
@@ -59,6 +60,10 @@ class A3CLearner(Thread):
         # TODO epoch as tf variable?
         self._epoch = 1
         self.train_scores = []
+        self.train_actions = []
+        self.train_frameskips = []
+
+        self.test_interval = test_interval
 
         self.local_steps_per_epoch = settings["local_steps_per_epoch"]
         self._run_tests = settings["test_episodes_per_epoch"] > 0 and settings["run_tests"]
@@ -102,9 +107,19 @@ class A3CLearner(Thread):
         if self.thread_index == 0 and not test_only:
             self._model_savefile = model_savefile
             if self.write_summaries:
+                self.actions_placeholder = tf.placeholder(tf.int32, None)
+                self.frameskips_placeholder = tf.placeholder(tf.int32, None)
                 self.scores_placeholder, summaries = setup_vector_summaries(scenario_tag + "/scores")
+
+                # TODO remove scenario_tag from histograms
+                a_histogram = tf.summary.histogram(scenario_tag + "/actions", self.actions_placeholder)
+                fs_histogram = tf.summary.histogram(scenario_tag + "/frameskips", self.frameskips_placeholder)
+                score_histogram = tf.summary.histogram("scores", self.scores_placeholder)
                 lr_summary = tf.summary.scalar(scenario_tag + "/learning_rate", self.learning_rate)
                 summaries.append(lr_summary)
+                summaries.append(a_histogram)
+                summaries.append(fs_histogram)
+                summaries.append(score_histogram)
                 self._summaries = tf.summary.merge(summaries)
                 self._train_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self.run_id_string, "train"),
                                                            flush_secs=writer_flush_secs, max_queue=writer_max_queue)
@@ -160,6 +175,9 @@ class A3CLearner(Thread):
                     self.local_network.reset_state()
                 break
 
+        self.train_actions += actions
+        self.train_frameskips += [self.doom_wrapper._frameskip] * len(actions)
+
         if terminal:
             R = 0.0
         else:
@@ -198,8 +216,9 @@ class A3CLearner(Thread):
             reward = self.doom_wrapper.make_action(action_index, frameskip)
             if return_stats:
                 actions.append(action_index)
+                if frameskip is None:
+                    frameskip = self.doom_wrapper._frameskip
                 frameskips.append(frameskip)
-
                 rewards.append(reward)
 
         total_reward = self.doom_wrapper.get_total_reward()
@@ -214,10 +233,14 @@ class A3CLearner(Thread):
 
         test_start_time = time.time()
         test_rewards = []
+        test_actions = []
+        test_frameskips = []
         for _ in trange(episodes_num, desc="Testing", file=sys.stdout,
                         leave=False, disable=not self.enable_progress_bar):
-            total_reward = self.run_episode(deterministic=deterministic)
+            total_reward, actions, frameskips, _ = self.run_episode(deterministic=deterministic, return_stats=True)
             test_rewards.append(total_reward)
+            test_actions += actions
+            test_frameskips += frameskips
 
         self.doom_wrapper.reset()
         if self.local_network.has_state():
@@ -235,7 +258,7 @@ class A3CLearner(Thread):
                 red("{:0.3f}".format(min_score)),
                 blue("{:0.3f}".format(max_score)),
                 sec_to_str(test_duration)))
-        return test_rewards
+        return test_rewards, test_actions, test_frameskips
 
     def _print_train_log(self, scores, overall_start_time, last_log_time, steps):
         current_time = time.time()
@@ -250,10 +273,11 @@ class A3CLearner(Thread):
         global_steps_per_sec = global_steps / elapsed_time
         global_mil_steps_per_hour = global_steps_per_sec * 3600 / 1000000.0
         log(
-            "TRAIN: {}(GlobalSteps), mean: {}, min: {}, max: {}, "
-            " LocalSpd: {:.0f} STEPS/s GlobalSpd: "
+            "TRAIN: {}(GlobalSteps), {} episodes, mean: {}, min: {}, max: {}, "
+            "\nLocalSpd: {:.0f} STEPS/s GlobalSpd: "
             "{} STEPS/s, {:.2f}M STEPS/hour, total elapsed time: {}".format(
                 global_steps,
+                len(scores),
                 green("{:0.3f}±{:0.2f}".format(mean_score, score_std)),
                 red("{:0.3f}".format(min_score)),
                 blue("{:0.3f}".format(max_score)),
@@ -281,16 +305,22 @@ class A3CLearner(Thread):
                     if self.thread_index == 0:
                         self._print_train_log(self.train_scores, overall_start_time, last_log_time, local_steps_for_log)
 
-                        if self._run_tests:
-                            test_scores = self.test(deterministic=self.deterministic_testing)
+                        reun_test_this_epoch = (self._epoch % self.test_interval) == 0
+                        if self._run_tests and reun_test_this_epoch:
+                            test_scores, test_actions, test_frameskips = self.test(
+                                deterministic=self.deterministic_testing)
 
                         if self.write_summaries:
                             train_summary = self._session.run(self._summaries,
-                                                              {self.scores_placeholder: self.train_scores})
+                                                              {self.scores_placeholder: self.train_scores,
+                                                               self.actions_placeholder: self.train_actions,
+                                                               self.frameskips_placeholder: self.train_frameskips})
                             self._train_writer.add_summary(train_summary, global_steps)
-                            if self._run_tests:
+                            if self._run_tests and reun_test_this_epoch:
                                 test_summary = self._session.run(self._summaries,
-                                                                 {self.scores_placeholder: test_scores})
+                                                                 {self.scores_placeholder: test_scores,
+                                                                  self.actions_placeholder: test_actions,
+                                                                  self.frameskips_placeholder: test_frameskips})
                                 self._test_writer.add_summary(test_summary, global_steps)
 
                         last_log_time = time.time()
@@ -302,6 +332,8 @@ class A3CLearner(Thread):
                             self.save_model()
                         log("")
                     self.train_scores = []
+                    self.train_actions = []
+                    self.train_frameskips = []
 
         except (SignalException, ViZDoomUnexpectedExitException):
             threadsafe_print(red("Thread #{} aborting(ViZDoom killed).".format(self.thread_index)))
@@ -390,10 +422,12 @@ class ADQNLearner(A3CLearner):
             reward = self.doom_wrapper.make_action(action_index)
             terminal = self.doom_wrapper.is_terminal()
             rewards_reversed.insert(0, reward)
+
             self.local_steps += 1
             if terminal:
                 if self.thread_index == 0:
                     self.train_scores.append(self.doom_wrapper.get_total_reward())
+
                 self.doom_wrapper.reset()
                 if self.local_network.has_state():
                     self.local_network.reset_state()
@@ -465,7 +499,7 @@ class ADQNLearner(A3CLearner):
                         self._print_train_log(self.train_scores, overall_start_time, last_log_time, local_steps_for_log)
 
                         if self._run_tests:
-                            test_scores = self.test(deterministic=self.deterministic_testing)
+                            test_scores, actions, frameskips = self.test(deterministic=self.deterministic_testing)
 
                         if self.write_summaries:
                             train_summary = self._session.run(self._summaries,
@@ -488,6 +522,8 @@ class ADQNLearner(A3CLearner):
                         log("")
 
                     self.train_scores = []
+                    self.train_actions = []
+                    self.train_frameskips = []
 
         except (SignalException, ViZDoomUnexpectedExitException):
             threadsafe_print(red("Thread #{} aborting(ViZDoom killed).".format(self.thread_index)))
@@ -569,6 +605,9 @@ class FigarA3CLearner(A3CLearner):
                     self.local_network.reset_state()
                 break
 
+        self.train_actions += actions
+        self.train_frameskips += frameskips
+
         if terminal:
             R = 0.0
         else:
@@ -600,31 +639,31 @@ class FigarA3CLearner(A3CLearner):
         return steps_performed
 
     @staticmethod
-    def choose_best_frameskip_continuous(mu, sigma, deterministic=True):
-        # # Binomial test:
-        # if deterministic:
-        #
-        #     frameskip = int(mu*sigma)+1
-        # else:
-        #     frameskip = int(np.random.binomial(mu,sigma))+1
-        # return frameskip
-
+    def choose_best_frameskip_binomial(n, p, deterministic=True):
+        # Binomial test:
         if deterministic:
-            frameskip_float = mu
+
+            frameskip = int(n * p) + 1
         else:
-            frameskip_float = np.random.normal(mu, sigma)
-        frameskip = int(max(1, round(frameskip_float)))
+            frameskip = int(np.random.binomial(n, p)) + 1
         return frameskip
+
+        # if deterministic:
+        #     frameskip_float = mu
+        # else:
+        #     frameskip_float = np.random.normal(mu, sigma)
+        # frameskip = int(max(1, round(frameskip_float)))
+        # return frameskip
 
     def _get_best_action(self, sess, state, deterministic=True):
         policy, frameskip_policy = self.local_network.get_policy(sess, state)
         action_index = self.choose_best_index(policy, deterministic=deterministic)
         if self.continuous_frameskip:
-            mu, sigma = frameskip_policy
+            n, p = frameskip_policy
             if self.multi_frameskip:
-                mu = mu[action_index]
-                sigma = sigma[action_index]
-            frameskip = self.choose_best_frameskip_continuous(mu, sigma, deterministic=deterministic)
+                n = n[action_index]
+                p = p[action_index]
+            frameskip = self.choose_best_frameskip_binomial(n, p, deterministic=deterministic)
         else:
             frameskip_index = self.choose_best_index(frameskip_policy, deterministic=deterministic)
             frameskip = self.frameskips[frameskip_index]

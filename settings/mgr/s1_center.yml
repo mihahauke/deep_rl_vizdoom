@@ -1,0 +1,9 @@
+config_file: defend_the_center.cfg
+scenario_tag: defend_center
+misc_scale: [0.01]
+###########################################################
+epochs: 200
+local_steps_per_epoch: 8000
+test_episodes_per_epoch: 100
+test_interval: 10
+decay_steps: 1e5
