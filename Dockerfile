@@ -42,18 +42,17 @@ RUN apt-get update && apt-get install -y \
 # Python3 with pip3
 RUN pip3 install pip --upgrade
 
+# Vizdoom and other pip3 packages if needed
+RUN git clone https://github.com/mwydmuch/ViZDoom vizdoom
+
+RUN cd vizdoom; pip3 install .
+
 RUN pip3 --no-cache-dir install \
-         tensorflow-gpu \
+         tensorflow-gpu==1.2.0 \
          opencv-python==3.1.0.3 \
          ruamel.yaml \
          numpy \
          tqdm
-
-# Vizdoom and other pip3 packages if needed
-RUN pip
-RUN git clone https://github.com/mwydmuch/ViZDoom vizdoom
-
-RUN cd vizdoom; pip3 install .
 
 WORKDIR /home
 
