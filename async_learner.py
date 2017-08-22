@@ -114,7 +114,7 @@ class A3CLearner(Thread):
                 # TODO remove scenario_tag from histograms
                 a_histogram = tf.summary.histogram(scenario_tag + "/actions", self.actions_placeholder)
                 fs_histogram = tf.summary.histogram(scenario_tag + "/frameskips", self.frameskips_placeholder)
-                score_histogram = tf.summary.histogram("scores", self.scores_placeholder)
+                score_histogram = tf.summary.histogram(scenario_tag + "/scores", self.scores_placeholder)
                 lr_summary = tf.summary.scalar(scenario_tag + "/learning_rate", self.learning_rate)
                 summaries.append(lr_summary)
                 summaries.append(a_histogram)
