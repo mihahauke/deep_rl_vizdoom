@@ -60,14 +60,14 @@ class VizdoomWrapper(object):
         self._stack_n_frames = stack_n_frames
         assert len(resolution) == 2
         self._resolution = tuple(resolution)
-        self._frameskip = frameskip
+        self.frameskip = frameskip
         self._reward_scale = reward_scale
 
         self._img_channels = stack_n_frames
         self.img_shape = (stack_n_frames, resolution[1], resolution[0])
         # TODO allow continuous actions
-        self._actions = [list(a) for a in it.product([0, 1], repeat=len(doom.get_available_buttons()))]
-        self.actions_num = len(self._actions)
+        self.actions = [list(a) for a in it.product([0, 1], repeat=len(doom.get_available_buttons()))]
+        self.actions_num = len(self.actions)
         self._current_screen = None
         self._current_stacked_screen = np.zeros(self.img_shape, dtype=np.float32)
 
@@ -138,8 +138,8 @@ class VizdoomWrapper(object):
 
     def make_action(self, action_index, frameskip=None):
         if frameskip is None:
-            frameskip = self._frameskip
-        action = self._actions[action_index]
+            frameskip = self.frameskip
+        action = self.actions[action_index]
 
         reward = self.doom.make_action(action, frameskip) * self._reward_scale
 

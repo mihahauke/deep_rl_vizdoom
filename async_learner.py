@@ -40,6 +40,9 @@ class A3CLearner(Thread):
                  save_interval=1,
                  writer_max_queue=10,
                  writer_flush_secs=120,
+                 gamma_compensation=False,
+                 figar_gamma=False,
+                 gamma=0.99,
                  **settings):
         super(A3CLearner, self).__init__()
 
@@ -70,7 +73,17 @@ class A3CLearner(Thread):
         self.test_episodes_per_epoch = settings["test_episodes_per_epoch"]
         self._epochs = np.float32(settings["epochs"])
         self.max_remembered_steps = settings["max_remembered_steps"]
-        self.gamma = np.float32(settings["gamma"])
+
+        assert not (gamma_compensation and figar_gamma)
+
+        gamma = np.float32(gamma)
+
+        if gamma_compensation:
+            self.scale_gamma = lambda fskip: ((1-gamma**fskip)/(1-gamma), gamma ** fskip)
+        elif figar_gamma:
+            self.scale_gamma = lambda fskip: (1.0, gamma ** fskip)
+        else:
+            self.scale_gamma = lambda _: (1.0, gamma)
 
         if self.write_summaries and thread_index == 0 and not test_only:
             assert tf_logdir is not None
@@ -176,15 +189,17 @@ class A3CLearner(Thread):
                 break
 
         self.train_actions += actions
-        self.train_frameskips += [self.doom_wrapper._frameskip] * len(actions)
+        self.train_frameskips += [self.doom_wrapper.frameskip] * len(actions)
 
         if terminal:
             R = 0.0
         else:
             R = self.local_network.get_value(self._session, self.doom_wrapper.get_current_state())
 
+        # #TODO this could be handles smarter ....
         for ri in rewards_reversed:
-            R = ri + self.gamma * R
+            scale, gamma = self.scale_gamma(self.doom_wrapper.frameskip)
+            R = scale * ri + gamma * R
             Rs.insert(0, R)
 
         train_op_feed_dict = {
@@ -217,7 +232,7 @@ class A3CLearner(Thread):
             if return_stats:
                 actions.append(action_index)
                 if frameskip is None:
-                    frameskip = self.doom_wrapper._frameskip
+                    frameskip = self.doom_wrapper.frameskip
                 frameskips.append(frameskip)
                 rewards.append(reward)
 
@@ -540,7 +555,6 @@ class FigarA3CLearner(A3CLearner):
                  dynamic_frameskips=None,
                  multi_frameskip=False,
                  cfigar=False,
-                 correct_gamma=False,
                  **args):
         if dynamic_frameskips is not None:
             self.continuous_frameskip = False
@@ -556,7 +570,6 @@ class FigarA3CLearner(A3CLearner):
         else:
             self.continuous_frameskip = True
             self.multi_frameskip = multi_frameskip
-        self.correct_gamma = correct_gamma
         super(FigarA3CLearner, self).__init__(dynamic_frameskips=dynamic_frameskips,
                                               multi_frameskip=multi_frameskip,
                                               **args)
@@ -613,14 +626,10 @@ class FigarA3CLearner(A3CLearner):
         else:
             R = self.local_network.get_value(self._session, self.doom_wrapper.get_current_state())
 
-        if self.correct_gamma:
-            for ri, fs in zip(rewards_reversed, reversed(frameskips)):
-                R = ri + self.gamma ** fs * R
-                Rs.insert(0, R)
-        else:
-            for ri in rewards_reversed:
-                R = ri + self.gamma * R
-                Rs.insert(0, R)
+        for ri, fs in zip(rewards_reversed, reversed(frameskips)):
+            scale, gamma = self.scale_gamma(fs)
+            R = scale * ri + gamma * R
+            Rs.insert(0, R)
 
         train_op_feed_dict = {
             self.local_network.vars.state_img: states_img,
