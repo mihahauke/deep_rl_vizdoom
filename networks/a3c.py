@@ -240,15 +240,7 @@ class FigarACFFNet(_BaseACNet):
         self.ops.loss = policy_loss + value_loss - entropy * self._entropy_beta
 
     def policy_value_frameskip_layer(self, inputs):
-        pi = layers.fully_connected(inputs,
-                                    num_outputs=self.actions_num,
-                                    scope=self._name_scope + "/fc_pi",
-                                    activation_fn=tf.nn.softmax)
-        state_value = layers.linear(inputs,
-                                    num_outputs=1,
-                                    scope=self._name_scope + "/fc_value")
-        v = tf.reshape(state_value, [-1])
-
+        pi, v = self.policy_value_layer(inputs)
         if self.fs_stop_gradient:
             inputs = tf.stop_gradient(inputs)
         frameskip = layers.fully_connected(inputs,

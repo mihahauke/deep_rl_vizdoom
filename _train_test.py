@@ -38,7 +38,7 @@ def _train_common(settings):
         run_id_string = str(settings["run_tag"]) + "/" + run_id_string
 
     if settings["logdir"] is not None:
-        logfile = os.path.join(settings["logdir"], settings["scenario_tag"] + "_" + run_id_string.replace("/", "_"))
+        logfile = os.path.join(settings["logdir"], settings["scenario_tag"], run_id_string)
         setup_file_logger(logfile)
     settings["run_id_string"] = run_id_string
     log("Settings:")
@@ -52,7 +52,7 @@ def _train_common(settings):
     ensure_parent_directories(settings_output_file)
     log("Saving settings to: {}".format(settings_output_file))
     ruamel.yaml.YAML().dump(settings, open(settings_output_file, "w"))
-    
+
     return model_file
 
 

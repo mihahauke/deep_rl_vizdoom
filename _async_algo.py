@@ -82,7 +82,7 @@ def train_async(model_savefile, q_learning, settings):
     if q_learning:
         session.run(global_network.ops.unfreeze)
 
-    log(green("Starting training.\n"))
+    log(green("Started training.\n"))
 
     for l in learners:
         l.run_training(session)

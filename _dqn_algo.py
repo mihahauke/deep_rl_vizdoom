@@ -176,7 +176,7 @@ class DQN(object):
         overall_start_time = time()
         self.network.update_target_network(session)
 
-        log(green("Starting training.\n"))
+        log(green("Started training.\n"))
         while self._epoch <= self._epochs:
             self.doom_wrapper.reset()
             train_scores = []

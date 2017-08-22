@@ -10,8 +10,8 @@ network_class: BinomialFigarACLSTMNet
 
 cfigar: True
 multi_frameskip: True
-gamma_compensation: True
-figar_gamma: False
+gamma_compensation: False
+figar_gamma: True
 
 
 frameskip_stop_gradient: False
