@@ -17,6 +17,8 @@ initial_learning_rate: 0.00008
 final_learning_rate: 0.00001
 decay_steps: 10e06
 gamma: 0.99
+gamma_compensation: False
+figar_gamma: False
 
 initial_entropy_beta: 0.05
 final_entropy_beta: 0.0
