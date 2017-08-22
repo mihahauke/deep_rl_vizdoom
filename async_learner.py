@@ -557,7 +557,7 @@ class FigarA3CLearner(A3CLearner):
                  cfigar=False,
                  **args):
         if dynamic_frameskips is not None:
-            self.continuous_frameskip = False
+            self.binomial_frameskip = False
             if cfigar:
                 raise ValueError()
             if isinstance(dynamic_frameskips, (list, tuple)):
@@ -568,7 +568,7 @@ class FigarA3CLearner(A3CLearner):
         elif not cfigar:
             raise ValueError()
         else:
-            self.continuous_frameskip = True
+            self.binomial_frameskip = True
             self.multi_frameskip = multi_frameskip
         super(FigarA3CLearner, self).__init__(dynamic_frameskips=dynamic_frameskips,
                                               multi_frameskip=multi_frameskip,
@@ -596,10 +596,12 @@ class FigarA3CLearner(A3CLearner):
             steps_performed += 1
             current_state = self.doom_wrapper.get_current_state()
             action_index, frameskip = self._get_best_action(self._session, current_state, deterministic=False)
-            if self.continuous_frameskip:
+            if self.binomial_frameskip:
                 frameskips.append(frameskip)
             else:
                 frameskips.append(self.frameskips_indices[frameskip])
+            self.train_actions.append(action_index)
+            self.train_frameskips.append(frameskip)
 
             reward = self.doom_wrapper.make_action(action_index, frameskip)
             terminal = self.doom_wrapper.is_terminal()
@@ -618,8 +620,7 @@ class FigarA3CLearner(A3CLearner):
                     self.local_network.reset_state()
                 break
 
-        self.train_actions += actions
-        self.train_frameskips += frameskips
+
 
         if terminal:
             R = 0.0
@@ -667,7 +668,7 @@ class FigarA3CLearner(A3CLearner):
     def _get_best_action(self, sess, state, deterministic=True):
         policy, frameskip_policy = self.local_network.get_policy(sess, state)
         action_index = self.choose_best_index(policy, deterministic=deterministic)
-        if self.continuous_frameskip:
+        if self.binomial_frameskip:
             n, p = frameskip_policy
             if self.multi_frameskip:
                 n = n[action_index]
