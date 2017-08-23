@@ -5,13 +5,12 @@ epochs: 30
 local_steps_per_epoch: 32000
 test_episodes_per_epoch: 100
 
-initial_learning_rate: 0.00008
-final_learning_rate: 0.00001
-learning_rate_decay_steps: 1e06
+initial_learning_rate: 8e-5
+final_learning_rate: 1e-5
+decay_steps: 1e06
 
 initial_entropy_beta: 0.05
 final_entropy_beta: 0.0
-entropy_beta_decay_steps: 1e6
 
 run_tag: example_a3c_center
 
