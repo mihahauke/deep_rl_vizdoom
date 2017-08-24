@@ -64,3 +64,30 @@ def load_settings(default_settings_file, override_settings_files):
         exit(1)
 
     return settings
+
+
+def gray_square(val):
+    val = 232 + int(val * 23)
+    return "\x1b[48;5;{}m  {}".format(val, '\x1b[0m')
+
+
+def string_heatmap(mat, x_labels=None, y_labels=None):
+    mat = mat - mat.min()
+    mat /= mat.max()
+    if y_labels is None:
+        y_labels = [str(i) for i in range(mat.shape[0])]
+    if x_labels is None:
+        x_labels = [str(i) for i in range(mat.shape[1])]
+
+    x_labels_len = max([len(str(l)) for l in y_labels])
+
+    str_mat = ""
+    for i in range(mat.shape[0]):
+        str_mat += str(y_labels[i]) + " " * (x_labels_len + 1 - len(str(y_labels[i])))
+        for j in range(mat.shape[1]):
+            str_mat += gray_square(mat[i, j])
+        str_mat += "\n"
+    str_mat += " " * (x_labels_len + 1)
+    for yl in x_labels:
+        str_mat += (str(yl) + "  ")[0:2]
+    return str_mat
