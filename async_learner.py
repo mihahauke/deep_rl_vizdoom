@@ -4,6 +4,7 @@ import logging
 import sys
 import time
 from threading import Thread
+import datetime
 
 import numpy as np
 import tensorflow as tf
@@ -79,7 +80,7 @@ class A3CLearner(Thread):
         gamma = np.float32(gamma)
 
         if gamma_compensation:
-            self.scale_gamma = lambda fskip: ((1-gamma**fskip)/(1-gamma), gamma ** fskip)
+            self.scale_gamma = lambda fskip: ((1 - gamma ** fskip) / (1 - gamma), gamma ** fskip)
         elif figar_gamma:
             self.scale_gamma = lambda fskip: (1.0, gamma ** fskip)
         else:
@@ -345,6 +346,8 @@ class A3CLearner(Thread):
                         # Saves model
                         if self._epoch % self.save_interval == 0:
                             self.save_model()
+                        now = datetime.datetime.now()
+                        log("Time: {}:{}".format(now.hour, now.minute))
                         log("")
                     self.train_scores = []
                     self.train_actions = []
@@ -533,9 +536,7 @@ class ADQNLearner(A3CLearner):
                         # Saves model
                         if self._epoch % self.save_interval == 0:
                             self.save_model()
-
                         log("")
-
                     self.train_scores = []
                     self.train_actions = []
                     self.train_frameskips = []
@@ -602,7 +603,6 @@ class FigarA3CLearner(A3CLearner):
             else:
                 frameskips.append(self.frameskips_indices[frameskip])
 
-
             self.train_actions.append(action_index)
             self.train_frameskips.append(frameskip)
 
@@ -622,8 +622,6 @@ class FigarA3CLearner(A3CLearner):
                 if self.local_network.has_state():
                     self.local_network.reset_state()
                 break
-
-
 
         if terminal:
             R = 0.0
