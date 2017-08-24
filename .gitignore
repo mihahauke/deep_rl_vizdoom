@@ -100,3 +100,4 @@ test.py
 settings/*test.yml
 clean.sh
 tb.sh
+benchmark_scenarios
