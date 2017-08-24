@@ -3,7 +3,7 @@ scenario_tag: basic
 reward_scale: 0.01
 use_misc: True
 misc_scale: [0.01]
-input_n_last_actions: 4
+#input_n_last_actions: 4
 
 ###########################################################
 epochs: 200
@@ -11,3 +11,8 @@ local_steps_per_epoch: 4000
 test_episodes_per_epoch: 100
 test_interval: 1
 decay_steps: 1e5
+
+rmsprop:
+  decay: 0.99
+  momentum: 0.0
+  clip_norm: 0.0
