@@ -74,6 +74,10 @@ def gray_square(val):
 def string_heatmap(mat, x_labels=None, y_labels=None):
     mat = mat - mat.min()
     mat /= mat.max()
+    action_maxes = mat.max(1)
+    action_maxes[action_maxes == 0] = 1
+    anorm_mat = (mat.T / action_maxes).T
+
     if y_labels is None:
         y_labels = [str(i) for i in range(mat.shape[0])]
     if x_labels is None:
@@ -82,12 +86,20 @@ def string_heatmap(mat, x_labels=None, y_labels=None):
     x_labels_len = max([len(str(l)) for l in y_labels])
 
     str_mat = ""
+    space = "    "
     for i in range(mat.shape[0]):
         str_mat += str(y_labels[i]) + " " * (x_labels_len + 1 - len(str(y_labels[i])))
         for j in range(mat.shape[1]):
             str_mat += gray_square(mat[i, j])
+        str_mat += space
+        for j in range(mat.shape[1]):
+            str_mat += gray_square(anorm_mat[i, j])
         str_mat += "\n"
+
     str_mat += " " * (x_labels_len + 1)
+    x_axis = ""
     for yl in x_labels:
-        str_mat += (str(yl) + "  ")[0:2]
+        x_axis += (str(yl) + "  ")[0:2]
+    str_mat += x_axis + space + x_axis
+
     return str_mat

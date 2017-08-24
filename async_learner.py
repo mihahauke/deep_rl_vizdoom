@@ -16,7 +16,7 @@ import random
 from util import sec_to_str, threadsafe_print, ensure_parent_directories, create_directory
 from util.coloring import red, green, blue, yellow
 from util.logger import log
-from util.misc import setup_vector_summaries
+from util.misc import setup_vector_summaries, string_heatmap
 from vizdoom_wrapper import VizdoomWrapper
 
 
@@ -139,6 +139,20 @@ class A3CLearner(Thread):
                                                            flush_secs=writer_flush_secs, max_queue=writer_max_queue)
                 self._test_writer = tf.summary.FileWriter("{}/{}/{}".format(tf_logdir, self.run_id_string, "test"),
                                                           flush_secs=writer_flush_secs, max_queue=writer_max_queue)
+
+    def heatmap(self, actions, frameskips):
+        min_frameskip = np.min(frameskips)
+        max_frameskip = np.max(frameskips)
+        fs_values = range(min_frameskip, max_frameskip + 1)
+
+        a_labels = [str(a) for a in self.doom_wrapper.actions]
+
+        mat = np.zeros((self.actions_num, (len(fs_values))))
+
+        for f, a in zip(frameskips, actions):
+            mat[a, f - min_frameskip] += 1
+
+        return string_heatmap(mat, fs_values, a_labels)
 
     @staticmethod
     def choose_best_index(policy, deterministic=True):
@@ -320,9 +334,8 @@ class A3CLearner(Thread):
 
                     if self.thread_index == 0:
                         self._print_train_log(self.train_scores, overall_start_time, last_log_time, local_steps_for_log)
-
-                        reun_test_this_epoch = (self._epoch % self.test_interval) == 0
-                        if self._run_tests and reun_test_this_epoch:
+                        run_test_this_epoch = (self._epoch % self.test_interval) == 0
+                        if self._run_tests and run_test_this_epoch:
                             test_scores, test_actions, test_frameskips = self.test(
                                 deterministic=self.deterministic_testing)
 
@@ -332,7 +345,7 @@ class A3CLearner(Thread):
                                                                self.actions_placeholder: self.train_actions,
                                                                self.frameskips_placeholder: self.train_frameskips})
                             self._train_writer.add_summary(train_summary, global_steps)
-                            if self._run_tests and reun_test_this_epoch:
+                            if self._run_tests and run_test_this_epoch:
                                 test_summary = self._session.run(self._summaries,
                                                                  {self.scores_placeholder: test_scores,
                                                                   self.actions_placeholder: test_actions,
@@ -348,6 +361,11 @@ class A3CLearner(Thread):
                             self.save_model()
                         now = datetime.datetime.now()
                         log("Time: {}:{}".format(now.hour, now.minute))
+
+                        log("Hitmaps:")
+                        log(self.heatmap(self.train_actions, self.train_frameskips))
+                        if run_test_this_epoch:
+                            log(self.heatmap(test_actions, test_frameskips))
                         log("")
                     self.train_scores = []
                     self.train_actions = []

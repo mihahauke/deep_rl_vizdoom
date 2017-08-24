@@ -41,9 +41,6 @@ data /= data.sum()
 if args.cli:
     print(string_heatmap(data.T, fs_values, a_labels))
     print()
-    print("Action-wise normalized")
-    print(string_heatmap(action_normalized_data.T, fs_values, a_labels))
-
 else:
     import matplotlib.pyplot as plt
     import seaborn as sns
