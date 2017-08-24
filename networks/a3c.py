@@ -559,8 +559,8 @@ class BinomialFigarACLSTMNet(CFigarACLSTMNet):
         # TODO not implemented in tf :(
         # fentropy = tf.reduce_sum(binomial_dist.entropy(name="frameskip_entropy"))
         pie = tf.constant(math.pi, name="Pie")
-        fsentropy = 0.5 * tf.reduce_sum(tf.maximum(tf.log(2 * pie * fs_n * fs_p * (1 - fs_p)) + 1, 1e-20) + 1 / fs_n)
-
+        fsentropy = 0.5 * tf.reduce_sum(
+            tf.maximum(tf.log(2 * pie * fs_n * fs_p * (1 - fs_p)) + 1, 1e-20))  # + 1 / fs_n)
         policy_loss = - tf.reduce_sum((chosen_pi_log + fs_log_prob) * constant_advantage)
         value_loss = 0.5 * tf.reduce_sum(advantage ** 2)
         self.ops.loss = policy_loss + value_loss - entropy * self._entropy_beta - fsentropy * self._fsentropy_beta
