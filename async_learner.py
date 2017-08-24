@@ -655,7 +655,7 @@ class FigarA3CLearner(A3CLearner):
     def choose_best_frameskip_binomial(n, p, deterministic=True):
         # Binomial test:
         if deterministic:
-            frameskip = round(n * p) + 1
+            frameskip = int(round(n * p)) + 1
         else:
             # TODO maybe not round n - randomize
             frameskip = round(np.random.binomial(round(n), p)) + 1
