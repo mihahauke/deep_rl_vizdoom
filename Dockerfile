@@ -57,7 +57,7 @@ RUN pip3 --no-cache-dir install \
          numpy \
          tqdm
 
-RUN echo "LANG=en_US.UTF-8" > /etc/bash.bashrc
+RUN echo "export LANG=en_US.UTF-8" > /etc/bash.bashrc
 WORKDIR /home
 
 
