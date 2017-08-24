@@ -598,8 +598,11 @@ class FigarA3CLearner(A3CLearner):
             action_index, frameskip = self._get_best_action(self._session, current_state, deterministic=False)
             if self.binomial_frameskip:
                 frameskips.append(frameskip)
+                # TODO maybe put non integer here also?
             else:
                 frameskips.append(self.frameskips_indices[frameskip])
+
+
             self.train_actions.append(action_index)
             self.train_frameskips.append(frameskip)
 
@@ -652,10 +655,10 @@ class FigarA3CLearner(A3CLearner):
     def choose_best_frameskip_binomial(n, p, deterministic=True):
         # Binomial test:
         if deterministic:
-
-            frameskip = int(n * p) + 1
+            frameskip = round(n * p) + 1
         else:
-            frameskip = int(np.random.binomial(n, p)) + 1
+            # TODO maybe not round n - randomize
+            frameskip = round(np.random.binomial(round(n), p)) + 1
         return frameskip
 
         # if deterministic:
