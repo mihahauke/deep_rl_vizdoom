@@ -3,13 +3,21 @@ scenarios_path: benchmark_scenarios/scenarios
 scenario_tag: healthgathering
 reward_scale: 0.01
 misc_scale: [0.01]
-use_misc: True
+use_misc: False
 
 ###########################################################
 epochs: 200
 local_steps_per_epoch: 16000
 test_episodes_per_epoch: 100
 test_interval: 10
-decay_steps: 1e5
+decay_steps: 1e6
 gamma: 0.99
 frameskip: 10
+
+initial_learning_rate: 8e-5
+final_learning_rate: 1e-6
+
+rmsprop:
+  decay: 0.99
+  momentum: 0.0
+  clip_norm: 00.0
