@@ -45,7 +45,7 @@ def _train_common(settings):
     print_settings(settings)
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(settings["tf_log_level"])
-    model_dir = os.path.join(settings["models_path"], run_id_string)
+    model_dir = os.path.join(settings["models_path"], settings["scenario_tag"], run_id_string)
     model_file = os.path.join(model_dir, "model")
     settings_output_file = os.path.join(model_dir, "setings.yml")
 
