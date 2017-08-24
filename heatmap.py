@@ -2,14 +2,11 @@
 # -*- coding: utf-8 -*-
 import itertools as it
 import pickle
-
-import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
+
 from argparse import ArgumentParser
 from util.misc import string_heatmap
 
-plt.style.use("ggplot")
 np.set_printoptions(precision=2)
 
 parser = ArgumentParser()
@@ -48,6 +45,11 @@ if args.cli:
     print(string_heatmap(action_normalized_data.T, fs_values, a_labels))
 
 else:
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    plt.style.use("ggplot")
+    
     fig, axes = plt.subplots(1, 2)
     fig.canvas.set_window_title(args.input_filename)
 
