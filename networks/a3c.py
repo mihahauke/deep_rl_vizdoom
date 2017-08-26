@@ -4,7 +4,7 @@ import math
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.contrib import layers
+from tensorflow.contrib.layers import fully_connected, conv2d, linear
 from tensorflow.contrib.framework import arg_scope
 from tensorflow.contrib.rnn import LSTMStateTuple
 
@@ -33,21 +33,23 @@ class _BaseACNet(_BaseNetwork):
                 decay_steps=decay_steps,
                 global_step=tf.train.get_global_step())
 
-        with arg_scope([layers.conv2d], data_format="NCHW"), \
-             arg_scope([layers.fully_connected, layers.conv2d], activation_fn=self.activation_fn):
+        with arg_scope([conv2d], data_format="NCHW"), \
+             arg_scope([fully_connected, conv2d],
+                       activation_fn=self.activation_fn,
+                       biases_initializer=tf.constant_initializer(self.init_bias)):
             self.create_architecture()
 
         self._prepare_loss_op()
         self.params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self._name_scope)
 
     def policy_value_layer(self, inputs):
-        pi = layers.fully_connected(inputs,
-                                    num_outputs=self.actions_num,
-                                    scope=self._name_scope + "/fc_pi",
-                                    activation_fn=tf.nn.softmax)
-        state_value = layers.linear(inputs,
-                                    num_outputs=1,
-                                    scope=self._name_scope + "/fc_value")
+        pi = fully_connected(inputs,
+                             num_outputs=self.actions_num,
+                             scope=self._name_scope + "/fc_pi",
+                             activation_fn=tf.nn.softmax)
+        state_value = linear(inputs,
+                             num_outputs=1,
+                             scope=self._name_scope + "/fc_value")
         v = tf.reshape(state_value, [-1])
         return pi, v
 
@@ -113,10 +115,9 @@ class ACFFNet(_BaseACNet):
     def create_architecture(self):
         fc_input = self.get_input_layers()
 
-        fc1 = layers.fully_connected(fc_input,
-                                     num_outputs=self.fc_units_num,
-                                     scope=self._name_scope + "/fc1",
-                                     biases_initializer=tf.constant_initializer(0.1))
+        fc1 = fully_connected(fc_input,
+                              num_outputs=self.fc_units_num,
+                              scope=self._name_scope + "/fc1")
 
         self.ops.pi, self.ops.v = self.policy_value_layer(fc1)
 
@@ -137,9 +138,8 @@ class _BaseACRecurrentNet(_BaseACNet):
 
         fc_input = self.get_input_layers()
 
-        fc1 = layers.fully_connected(fc_input, num_outputs=self.fc_units_num,
-                                     scope=self._name_scope + "/fc1",
-                                     biases_initializer=tf.constant_initializer(0.1))
+        fc1 = fully_connected(fc_input, num_outputs=self.fc_units_num,
+                              scope=self._name_scope + "/fc1")
 
         fc1_reshaped = tf.reshape(fc1, [1, -1, self.fc_units_num])
         self.recurrent_cells = self.ru_class(self._recurrent_units_num)
@@ -243,20 +243,19 @@ class FigarACFFNet(_BaseACNet):
         pi, v = self.policy_value_layer(inputs)
         if self.fs_stop_gradient:
             inputs = tf.stop_gradient(inputs)
-        frameskip = layers.fully_connected(inputs,
-                                           num_outputs=self._frameskips_num,
-                                           scope=self._name_scope + "/fc_frameskip",
-                                           activation_fn=tf.nn.softmax)
+        frameskip = fully_connected(inputs,
+                                    num_outputs=self._frameskips_num,
+                                    scope=self._name_scope + "/fc_frameskip",
+                                    activation_fn=tf.nn.softmax)
 
         return pi, frameskip, v
 
     def create_architecture(self):
         fc_input = self.get_input_layers()
 
-        fc1 = layers.fully_connected(fc_input,
-                                     num_outputs=self.fc_units_num,
-                                     scope=self._name_scope + "/fc1",
-                                     biases_initializer=tf.constant_initializer(0.1))
+        fc1 = fully_connected(fc_input,
+                              num_outputs=self.fc_units_num,
+                              scope=self._name_scope + "/fc1")
 
         self.ops.pi, self.ops.frameskip_pi, self.ops.v = self.policy_value_frameskip_layer(fc1)
 
@@ -292,9 +291,9 @@ class FigarACLSTMNet(FigarACFFNet):
 
         fc_input = self.get_input_layers()
 
-        fc1 = layers.fully_connected(fc_input, num_outputs=self.fc_units_num,
-                                     scope=self._name_scope + "/fc1",
-                                     biases_initializer=tf.constant_initializer(0.1))
+        fc1 = fully_connected(fc_input,
+                              num_outputs=self.fc_units_num,
+                              scope=self._name_scope + "/fc1")
 
         fc1_reshaped = tf.reshape(fc1, [1, -1, self.fc_units_num])
         self.recurrent_cells = self.ru_class(self._recurrent_units_num)
@@ -366,9 +365,8 @@ class CFigarACLSTMNet(FigarACLSTMNet):
 
         fc_input = self.get_input_layers()
 
-        fc1 = layers.fully_connected(fc_input, num_outputs=self.fc_units_num,
-                                     scope=self._name_scope + "/fc1",
-                                     biases_initializer=tf.constant_initializer(0.1))
+        fc1 = fully_connected(fc_input, num_outputs=self.fc_units_num,
+                              scope=self._name_scope + "/fc1")
 
         fc1_reshaped = tf.reshape(fc1, [1, -1, self.fc_units_num])
         self.recurrent_cells = self.ru_class(self._recurrent_units_num)
@@ -385,14 +383,14 @@ class CFigarACLSTMNet(FigarACLSTMNet):
 
         self.reset_state()
 
-        self.ops.pi = layers.fully_connected(reshaped_rnn_outputs,
-                                             num_outputs=self.actions_num,
-                                             scope=self._name_scope + "/fc_pi",
-                                             activation_fn=tf.nn.softmax)
+        self.ops.pi = fully_connected(reshaped_rnn_outputs,
+                                      num_outputs=self.actions_num,
+                                      scope=self._name_scope + "/fc_pi",
+                                      activation_fn=tf.nn.softmax)
 
-        state_value = layers.linear(reshaped_rnn_outputs,
-                                    num_outputs=1,
-                                    scope=self._name_scope + "/fc_value")
+        state_value = linear(reshaped_rnn_outputs,
+                             num_outputs=1,
+                             scope=self._name_scope + "/fc_value")
 
         self.ops.v = tf.reshape(state_value, [-1])
 
@@ -403,18 +401,18 @@ class CFigarACLSTMNet(FigarACLSTMNet):
 
         if self.fs_stop_gradient:
             reshaped_rnn_outputs = tf.stop_gradient(reshaped_rnn_outputs)
-        self.ops.frameskip_mu = 1 + layers.fully_connected(reshaped_rnn_outputs,
-                                                           num_outputs=frameskip_output_len,
-                                                           scope=self._name_scope + "/fc_frameskip_mu",
-                                                           activation_fn=tf.nn.relu,
-                                                           biases_initializer=tf.constant_initializer(self.fs_mu_bias))
+        self.ops.frameskip_mu = 1 + fully_connected(reshaped_rnn_outputs,
+                                                    num_outputs=frameskip_output_len,
+                                                    scope=self._name_scope + "/fc_frameskip_mu",
+                                                    activation_fn=tf.nn.relu,
+                                                    biases_initializer=tf.constant_initializer(self.fs_mu_bias))
 
-        self.ops.frameskip_variance = layers.fully_connected(reshaped_rnn_outputs,
-                                                             num_outputs=frameskip_output_len,
-                                                             scope=self._name_scope + "/fc_frameskip_variance",
-                                                             activation_fn=tf.nn.relu,
-                                                             biases_initializer=tf.constant_initializer(
-                                                                 self.fs_sigma_bias))
+        self.ops.frameskip_variance = fully_connected(reshaped_rnn_outputs,
+                                                      num_outputs=frameskip_output_len,
+                                                      scope=self._name_scope + "/fc_frameskip_variance",
+                                                      activation_fn=tf.nn.relu,
+                                                      biases_initializer=tf.constant_initializer(
+                                                          self.fs_sigma_bias))
 
         if not self.multi_frameskip:
             self.ops.frameskip_mu = tf.reshape(self.ops.frameskip_mu, (-1,))
@@ -478,9 +476,9 @@ class BinomialFigarACLSTMNet(CFigarACLSTMNet):
 
         fc_input = self.get_input_layers()
 
-        fc1 = layers.fully_connected(fc_input, num_outputs=self.fc_units_num,
-                                     scope=self._name_scope + "/fc1",
-                                     biases_initializer=tf.constant_initializer(0.1))
+        fc1 = fully_connected(fc_input, num_outputs=self.fc_units_num,
+                              scope=self._name_scope + "/fc1",
+                              )
 
         fc1_reshaped = tf.reshape(fc1, [1, -1, self.fc_units_num])
         self.recurrent_cells = self.ru_class(self._recurrent_units_num)
@@ -497,14 +495,14 @@ class BinomialFigarACLSTMNet(CFigarACLSTMNet):
 
         self.reset_state()
 
-        self.ops.pi = layers.fully_connected(reshaped_rnn_outputs,
-                                             num_outputs=self.actions_num,
-                                             scope=self._name_scope + "/fc_pi",
-                                             activation_fn=tf.nn.softmax)
+        self.ops.pi = fully_connected(reshaped_rnn_outputs,
+                                      num_outputs=self.actions_num,
+                                      scope=self._name_scope + "/fc_pi",
+                                      activation_fn=tf.nn.softmax)
 
-        state_value = layers.linear(reshaped_rnn_outputs,
-                                    num_outputs=1,
-                                    scope=self._name_scope + "/fc_value")
+        state_value = linear(reshaped_rnn_outputs,
+                             num_outputs=1,
+                             scope=self._name_scope + "/fc_value")
 
         self.ops.v = tf.reshape(state_value, [-1])
 
@@ -516,17 +514,17 @@ class BinomialFigarACLSTMNet(CFigarACLSTMNet):
         if self.fs_stop_gradient:
             reshaped_rnn_outputs = tf.stop_gradient(reshaped_rnn_outputs)
 
-        self.ops.frameskip_n = 1 + layers.fully_connected(reshaped_rnn_outputs,
-                                                          num_outputs=frameskip_output_len,
-                                                          scope=self._name_scope + "/fc_frameskip_n",
-                                                          activation_fn=tf.nn.relu,
-                                                          biases_initializer=tf.constant_initializer(self.fs_n_bias))
+        self.ops.frameskip_n = 1 + fully_connected(reshaped_rnn_outputs,
+                                                   num_outputs=frameskip_output_len,
+                                                   scope=self._name_scope + "/fc_frameskip_n",
+                                                   activation_fn=tf.nn.relu,
+                                                   biases_initializer=tf.constant_initializer(self.fs_n_bias))
 
-        self.ops.frameskip_p = layers.fully_connected(reshaped_rnn_outputs,
-                                                      num_outputs=frameskip_output_len,
-                                                      scope=self._name_scope + "/fc_frameskip_p",
-                                                      activation_fn=tf.nn.sigmoid,
-                                                      biases_initializer=tf.constant_initializer(self.fs_p_bias))
+        self.ops.frameskip_p = fully_connected(reshaped_rnn_outputs,
+                                               num_outputs=frameskip_output_len,
+                                               scope=self._name_scope + "/fc_frameskip_p",
+                                               activation_fn=tf.nn.sigmoid,
+                                               biases_initializer=tf.constant_initializer(self.fs_p_bias))
         eps = 1e-20
         self.ops.frameskip_p = tf.clip_by_value(self.ops.frameskip_p, eps, 1 - eps)
         if not self.multi_frameskip:

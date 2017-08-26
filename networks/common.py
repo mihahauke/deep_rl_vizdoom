@@ -38,9 +38,11 @@ class _BaseNetwork(object):
                  conv_filters_sizes=(8, 4, 3),
                  conv_strides=(4, 2, 1),
                  activation_fn="tf.nn.relu",
+                 init_bias=0.1,
                  fc_units_num=256,
                  **ignored):
         self.actions_num = actions_num
+        self.init_bias = init_bias
         self.conv_filters_num = conv_filters_num
         self.conv_filters_sizes = conv_filters_sizes
         self.conv_strides = conv_strides

@@ -44,6 +44,7 @@ class A3CLearner(Thread):
                  gamma_compensation=False,
                  figar_gamma=False,
                  gamma=0.99,
+                 show_heatmaps=True,
                  **settings):
         super(A3CLearner, self).__init__()
 
@@ -66,7 +67,7 @@ class A3CLearner(Thread):
         self.train_scores = []
         self.train_actions = []
         self.train_frameskips = []
-
+        self.show_heatmaps = show_heatmaps
         self.test_interval = test_interval
 
         self.local_steps_per_epoch = settings["local_steps_per_epoch"]
@@ -333,6 +334,7 @@ class A3CLearner(Thread):
                     self._epoch += 1
 
                     if self.thread_index == 0:
+                        log("EPOCH {}".format(self._epoch))
                         self._print_train_log(self.train_scores, overall_start_time, last_log_time, local_steps_for_log)
                         run_test_this_epoch = (self._epoch % self.test_interval) == 0
                         if self._run_tests and run_test_this_epoch:
@@ -362,10 +364,13 @@ class A3CLearner(Thread):
                         now = datetime.datetime.now()
                         log("Time: {}:{}".format(now.hour, now.minute))
 
-                        log("Hitmaps:")
-                        log(self.heatmap(self.train_actions, self.train_frameskips))
-                        if run_test_this_epoch:
-                            log(self.heatmap(test_actions, test_frameskips))
+                        if self.show_heatmaps:
+                            log("Train heatmaps:")
+                            log(self.heatmap(self.train_actions, self.train_frameskips))
+                            log("")
+                            if run_test_this_epoch:
+                                log("Test heatmaps:")
+                                log(self.heatmap(test_actions, test_frameskips))
                         log("")
                     self.train_scores = []
                     self.train_actions = []
