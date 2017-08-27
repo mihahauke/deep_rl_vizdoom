@@ -22,13 +22,13 @@ actions = stats["actions"]
 
 min_frameskip = frameskips.min()
 max_frameskip = frameskips.max()
-fs_values = range(min_frameskip, max_frameskip + 1)
-a_values = range(max(actions) + 1)
+fs_values = list(range(min_frameskip, max_frameskip + 1))
+a_values = list(range(max(actions) + 1))
 buttons_num = max(int(np.ceil(np.log2(len(a_values)))), 3)
 
 a_labels = [str(l) for l in it.product([0, 1], repeat=buttons_num)]
 
-data = np.zeros((len(fs_values), len(a_values)))
+data = np.zeros((len(fs_values), len(a_labels)))
 
 for f, a in zip(frameskips, actions):
     data[f - min_frameskip, a] += 1

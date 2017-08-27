@@ -5,6 +5,7 @@ from paths import *
 import ruamel.yaml
 from .logger import log
 from .coloring import red
+import numpy as np
 
 import tensorflow as tf
 
@@ -72,12 +73,13 @@ def gray_square(val):
 
 
 def string_heatmap(mat, x_labels=None, y_labels=None):
+    # TODO refactor this piec of shit code some day
     mat = mat - mat.min()
     mat /= mat.max()
     action_maxes = mat.max(1)
     action_maxes[action_maxes == 0] = 1
     anorm_mat = (mat.T / action_maxes).T
-
+    mat_sum = np.sum(mat)
     if y_labels is None:
         y_labels = [str(i) for i in range(mat.shape[0])]
     if x_labels is None:
@@ -87,19 +89,21 @@ def string_heatmap(mat, x_labels=None, y_labels=None):
 
     str_mat = ""
     space = "    "
-    for i in range(mat.shape[0]):
-        str_mat += str(y_labels[i]) + " " * (x_labels_len + 1 - len(str(y_labels[i])))
-        for j in range(mat.shape[1]):
-            str_mat += gray_square(mat[i, j])
+    for row_i in range(mat.shape[0]):
+        str_mat += str(y_labels[row_i]) + " " * (x_labels_len + 1 - len(str(y_labels[row_i])))
+        str_mat += " {:2.0f}%  ".format(np.sum(mat[row_i]) / mat_sum * 100)
+        for column_j in range(mat.shape[1]):
+            str_mat += gray_square(mat[row_i, column_j])
+
         str_mat += space
-        for j in range(mat.shape[1]):
-            str_mat += gray_square(anorm_mat[i, j])
+        for column_j in range(mat.shape[1]):
+            str_mat += gray_square(anorm_mat[row_i, column_j])
         str_mat += "\n"
 
     str_mat += " " * (x_labels_len + 1)
     x_axis = ""
     for yl in x_labels:
         x_axis += (str(yl) + "  ")[0:2]
-    str_mat += x_axis + space + x_axis
+    str_mat += "      " + x_axis + space + x_axis
 
     return str_mat
