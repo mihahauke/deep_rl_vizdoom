@@ -200,9 +200,11 @@ class FakeVizdoomWrapper(object):
                  pull_penalty=0,
                  edge_death=False,
                  edge_penalty=-0.1,
+                 min_box_dist=0,
                  **kwargs):
         assert resolution[1] % map_height == 0
         assert resolution[0] % fov == 0
+        assert box_span % 2 == 1
 
         self.visible = display
         self.step = 0
@@ -221,6 +223,7 @@ class FakeVizdoomWrapper(object):
         self.max_steps = max_steps
         self.living_reward = living_reward
         self.edge_penalty = edge_penalty
+        self.min_box_dist = min_box_dist
         ###################################
 
         if display and smooth_display:
@@ -252,7 +255,7 @@ class FakeVizdoomWrapper(object):
         if input_n_last_actions:
             self.use_misc = True
             self.input_n_last_actions = input_n_last_actions
-            self.misc_len = self.actions_num*self.input_n_last_actions
+            self.misc_len = self.actions_num * self.input_n_last_actions
             self.last_n_actions = np.zeros(self.misc_len, dtype=np.float32)
             self._current_stacked_misc = np.zeros(self.misc_len, dtype=np.float32)
 
@@ -276,30 +279,38 @@ class FakeVizdoomWrapper(object):
         self._current_stacked_screen = np.append(self._current_stacked_screen[1:], current_screen, axis=0)
 
     def create_new_box(self):
+        x = sample(self.free_spaces, 1)[0]
+        y = np.random.randint(self.min_box_dist, self.map_height - 1)
+        self.free_spaces.remove(x)
+        self.boxes[x] = y
+        self.draw_box(x)
 
-        if self.box_span != 1:
-            raise NotImplemented()
-        else:
-            x = sample(self.free_spaces, 1)[0]
-            y = np.random.randint(0, self.map_height - 1)
-            self.free_spaces.remove(x)
-            self.boxes[x] = y
-            self.map[x, y] = 1
+    def draw_box(self, x):
+        y = self.boxes[x]
+        self.map[x] = 0
+        self.map[x, y] = 1
+        if self.box_span > 1:
+            delta = (self.box_span - 1) // 2
+            vals = np.linspace(0, 1, delta + 2)[1:-1]
+            for i, val in enumerate(vals):
+                if y + i - delta >= 0:
+                    self.map[x, y + i - delta] = val
+                if y - i + delta < self.map_height:
+                    self.map[x, y - i + delta] = val
+
+    def remove_box(self):
+        del self.boxes[self.x]
+        self.map[self.x, :] = 0
+        self.free_spaces.add(self.x)
 
     def pull_box(self):
-        if self.box_span != 1:
-            raise NotImplementedError()
+        y = self.boxes[self.x]
+        if y == 0:
+            self.create_new_box()
+            self.remove_box()
         else:
-            y = self.boxes[self.x]
-            if y == 0:
-                del self.boxes[self.x]
-                self.free_spaces.add(self.x)
-                self.map[self.x, y] = 0
-                self.create_new_box()
-            else:
-                self.boxes[self.x] -= 1
-                self.map[self.x, y] = 0
-                self.map[self.x, y - 1] = 1
+            self.boxes[self.x] -= 1
+            self.draw_box(self.x)
 
     def reset(self):
         self.step = 0
@@ -344,9 +355,9 @@ class FakeVizdoomWrapper(object):
             elif action == Actions.SCORE:
                 if self.map[self.x, 0] > 0:
                     reward += self.map[self.x, 0]
-                    self.map[self.x, 0] = 0
-                    del self.boxes[self.x]
                     self.create_new_box()
+                    self.remove_box()
+
                 else:
                     reward += self.miss_penalty
             elif action == Actions.PULL:
