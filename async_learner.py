@@ -341,7 +341,7 @@ class A3CLearner(Thread):
                         log("EPOCH {}".format(self._epoch - 1))
                         self._print_train_log(
                             self.train_scores, overall_start_time, last_log_time, local_steps_for_log)
-                        run_test_this_epoch = ((self._epoch-1) % self.test_interval) == 0
+                        run_test_this_epoch = ((self._epoch - 1) % self.test_interval) == 0
                         if self._run_tests and run_test_this_epoch:
                             test_scores, test_actions, test_frameskips = self.test(
                                 deterministic=self.deterministic_testing)
@@ -675,6 +675,8 @@ class FigarA3CLearner(A3CLearner):
             train_op_feed_dict[self.local_network.vars.sequence_length] = [len(actions)]
 
         self._session.run(self.train_op, feed_dict=train_op_feed_dict)
+
+
         return steps_performed
 
     @staticmethod
@@ -690,11 +692,7 @@ class FigarA3CLearner(A3CLearner):
     def _get_best_action(self, sess, state, deterministic=True):
         policy, frameskip_policy = self.local_network.get_policy(sess, state)
 
-        # give_fucks(self.thread_index, DEBUG, frameskip_policy)
 
-        if np.isnan(policy).any():
-            print("{} Aborting".format(self.thread_index))
-            exit(0)
         action_index = self.choose_best_index(policy, deterministic=deterministic)
         if self.binomial_frameskip:
             n, p = frameskip_policy
@@ -708,13 +706,3 @@ class FigarA3CLearner(A3CLearner):
 
         return action_index, frameskip
 
-
-# np.set_printoptions(precision=2)
-# FILES = [open("stats/fucks/fuck_{}.txt".format(i), "w") for i in range(16)]
-#
-#
-# def give_fucks(th_i,p, fp):
-#     pi = " ".join(["{:0.2f}".format(pi) for pi in p])
-#     fn = " ".join(["{:0.2f}".format(n) for n in fp[0]])
-#     fp = " ".join(["{:0.2f}".format(p) for p in fp[1]])
-#     print("{} | {} | {}".format(pi, fn, fp), file=FILES[th_i])

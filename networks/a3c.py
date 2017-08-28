@@ -495,11 +495,11 @@ class BinomialFigarACLSTMNet(CFigarACLSTMNet):
 
         self.reset_state()
 
-        self.ops.pi = fully_connected(reshaped_rnn_outputs,
-                                      num_outputs=self.actions_num,
-                                      scope=self._name_scope + "/fc_pi",
-                                      activation_fn=tf.nn.softmax)
-
+        self.ops.pi_logits = fully_connected(reshaped_rnn_outputs,
+                                             num_outputs=self.actions_num,
+                                             scope=self._name_scope + "/fc_pi",
+                                             activation_fn=None)
+        self.ops.pi = tf.nn.softmax(self.ops.pi_logits)
         state_value = linear(reshaped_rnn_outputs,
                              num_outputs=1,
                              scope=self._name_scope + "/fc_value")
@@ -520,13 +520,13 @@ class BinomialFigarACLSTMNet(CFigarACLSTMNet):
                                                    activation_fn=tf.nn.relu,
                                                    biases_initializer=tf.constant_initializer(self.fs_n_bias))
 
-        self.ops.frameskip_p = fully_connected(reshaped_rnn_outputs,
-                                               num_outputs=frameskip_output_len,
-                                               scope=self._name_scope + "/fc_frameskip_p",
-                                               activation_fn=tf.nn.sigmoid,
-                                               biases_initializer=tf.constant_initializer(self.fs_p_bias))
+        frameskip_p = fully_connected(reshaped_rnn_outputs,
+                                      num_outputs=frameskip_output_len,
+                                      scope=self._name_scope + "/fc_frameskip_p",
+                                      activation_fn=tf.nn.sigmoid,
+                                      biases_initializer=tf.constant_initializer(self.fs_p_bias))
         eps = 1e-20
-        self.ops.frameskip_p = tf.clip_by_value(self.ops.frameskip_p, eps, 1 - eps)
+        self.ops.frameskip_p = tf.clip_by_value(frameskip_p, eps, 1 - eps)
         if not self.multi_frameskip:
             self.ops.frameskip_n = tf.reshape(self.ops.frameskip_n, (-1,))
             self.ops.frameskip_p = tf.reshape(self.ops.frameskip_p, (-1,))
@@ -553,12 +553,13 @@ class BinomialFigarACLSTMNet(CFigarACLSTMNet):
             fs_p = self.ops.frameskip_p
 
         binomial_dist = tf.contrib.distributions.Binomial(total_count=fs_n, probs=fs_p)
-        fs_log_prob = binomial_dist.log_prob(self.vars.frameskip - 1)
-        # TODO not implemented in tf :(
-        # fentropy = tf.reduce_sum(binomial_dist.entropy(name="frameskip_entropy"))
+        caped_frameskip = tf.minimum(self.vars.frameskip - 1, fs_n)
+        fs_log_prob = binomial_dist.log_prob(caped_frameskip)
+
         pie = tf.constant(math.pi, name="Pie")
         fsentropy = 0.5 * tf.reduce_sum(
             tf.maximum(tf.log(2 * pie * fs_n * fs_p * (1 - fs_p)) + 1, 1e-20))  # + 1 / fs_n)
         policy_loss = - tf.reduce_sum((chosen_pi_log + fs_log_prob) * constant_advantage)
         value_loss = 0.5 * tf.reduce_sum(advantage ** 2)
         self.ops.loss = policy_loss + value_loss - entropy * self._entropy_beta - fsentropy * self._fsentropy_beta
+f
