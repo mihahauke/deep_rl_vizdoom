@@ -7,7 +7,7 @@ epochs: 200
 local_steps_per_epoch: 8000
 test_episodes_per_epoch: 100
 test_interval: 5
-decay_steps: 1e5
+decay_steps: 1e6
 
 rmsprop:
   decay: 0.99
@@ -19,9 +19,12 @@ frameskip: 1
 
 fake_game: true
 
-living_reward: -0.001
-miss_penalty: -0.001
-edge_penalty: -1
-map_len: 160
-map_height: 6
-boxes_num: 20
+living_reward:  -0.001
+miss_penalty:  -0.05
+edge_penalty:  -1
+map_len:  160
+map_height:  30
+boxes_num:  5
+max_steps:  400
+box_span:  3
+min_box_dist:  15
