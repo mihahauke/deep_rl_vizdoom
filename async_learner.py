@@ -367,7 +367,7 @@ class A3CLearner(Thread):
                         if self._epoch % self.save_interval == 0:
                             self.save_model()
                         now = datetime.datetime.now()
-                        log("Time: {}:{}".format(now.hour, now.minute))
+                        log("Time: {:2d}:{:02d}".format(now.hour, now.minute))
 
                         if self.show_heatmaps:
                             log("Train heatmaps:")
