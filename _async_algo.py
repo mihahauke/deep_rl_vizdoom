@@ -13,7 +13,7 @@ from util import ensure_parent_directories
 from util.coloring import green
 from util.logger import log
 from util.optimizers import ClippingRMSPropOptimizer
-from vizdoom_wrapper import VizdoomWrapper
+from vizdoom_wrapper import VizdoomWrapper, FakeVizdoomWrapper
 
 
 def train_async(model_savefile, q_learning, settings):
@@ -21,7 +21,11 @@ def train_async(model_savefile, q_learning, settings):
     config.gpu_options.allow_growth = True
     session = tf.Session(config=config)
 
-    proto_vizdoom = VizdoomWrapper(noinit=True, **settings)
+    if settings["fake_game"]:
+        Game = FakeVizdoomWrapper
+    else:
+        Game = VizdoomWrapper
+    proto_vizdoom = Game(noinit=True, **settings)
     actions_num = proto_vizdoom.actions_num
     misc_len = proto_vizdoom.misc_len
     img_shape = proto_vizdoom.img_shape
@@ -39,40 +43,46 @@ def train_async(model_savefile, q_learning, settings):
     learners = []
     NetworkClass = getattr(networks, settings["network_class"])
 
-    global_network = NetworkClass(actions_num=actions_num,
-                                  misc_len=misc_len,
-                                  img_shape=img_shape,
-                                  **settings)
+    global_network = NetworkClass(
+        actions_num=actions_num,
+        misc_len=misc_len,
+        img_shape=img_shape,
+        **settings)
     global_steps_counter = ThreadsafeCounter()
 
     if q_learning:
-        global_target_network = NetworkClass(thread="global_target",
-                                             actions_num=actions_num,
-                                             misc_len=misc_len,
-                                             img_shape=img_shape, **settings)
+        global_target_network = NetworkClass(
+            thread="global_target",
+            actions_num=actions_num,
+            misc_len=misc_len,
+            img_shape=img_shape, **settings)
         global_network.prepare_unfreeze_op(global_target_network)
         unfreeze_thread = min(1, settings["threads_num"] - 1)
         for i in range(settings["threads_num"]):
-            learner = async_learner.ADQNLearner(model_savefile=model_savefile,
-                                                thread_index=i, global_network=global_network,
-                                                unfreeze_thread=i == unfreeze_thread,
-                                                global_target_network=global_target_network,
-                                                optimizer=optimizer,
-                                                learning_rate=global_learning_rate,
-                                                global_steps_counter=global_steps_counter,
-                                                **settings)
+            learner = async_learner.ADQNLearner(
+                game=Game(**settings),
+                model_savefile=model_savefile,
+                thread_index=i, global_network=global_network,
+                unfreeze_thread=i == unfreeze_thread,
+                global_target_network=global_target_network,
+                optimizer=optimizer,
+                learning_rate=global_learning_rate,
+                global_steps_counter=global_steps_counter,
+                **settings)
             learners.append(learner)
     else:
 
         for i in range(settings["threads_num"]):
             LearnerClass = getattr(async_learner, settings["learner_class"])
-            learner = LearnerClass(model_savefile=model_savefile,
-                                   thread_index=i,
-                                   global_network=global_network,
-                                   optimizer=optimizer,
-                                   learning_rate=global_learning_rate,
-                                   global_steps_counter=global_steps_counter,
-                                   **settings)
+            learner = LearnerClass(
+                game=Game(**settings),
+                model_savefile=model_savefile,
+                thread_index=i,
+                global_network=global_network,
+                optimizer=optimizer,
+                learning_rate=global_learning_rate,
+                global_steps_counter=global_steps_counter,
+                **settings)
             learners.append(learner)
 
     log("Initializing variables...")

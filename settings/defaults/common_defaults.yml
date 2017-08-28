@@ -20,6 +20,7 @@ activation_fn: tf.nn.relu
 test_episodes_per_epoch: 100
 
 # Vizdoom wrapper options:
+fake_game: false
 resolution: [ 80, 60 ]
 vizdoom_resolution: RES_160X120
 vizdoom_async_mode: false

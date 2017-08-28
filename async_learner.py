@@ -23,6 +23,7 @@ from vizdoom_wrapper import VizdoomWrapper
 class A3CLearner(Thread):
     def __init__(self,
                  thread_index=0,
+                 game=None,
                  model_savefile=None,
                  network_class="ACLstmNet",
                  global_steps_counter=None,
@@ -96,7 +97,10 @@ class A3CLearner(Thread):
             if self.tf_models_path is not None:
                 create_directory(self.tf_models_path)
 
-        self.doom_wrapper = VizdoomWrapper(**settings)
+        if game is None:
+            self.doom_wrapper = VizdoomWrapper(**settings)
+        else:
+            self.doom_wrapper = game
         misc_len = self.doom_wrapper.misc_len
         img_shape = self.doom_wrapper.img_shape
         self.use_misc = self.doom_wrapper.use_misc
@@ -334,9 +338,10 @@ class A3CLearner(Thread):
                     self._epoch += 1
 
                     if self.thread_index == 0:
-                        log("EPOCH {}".format(self._epoch))
-                        self._print_train_log(self.train_scores, overall_start_time, last_log_time, local_steps_for_log)
-                        run_test_this_epoch = (self._epoch % self.test_interval) == 0
+                        log("EPOCH {}".format(self._epoch - 1))
+                        self._print_train_log(
+                            self.train_scores, overall_start_time, last_log_time, local_steps_for_log)
+                        run_test_this_epoch = ((self._epoch-1) % self.test_interval) == 0
                         if self._run_tests and run_test_this_epoch:
                             test_scores, test_actions, test_frameskips = self.test(
                                 deterministic=self.deterministic_testing)
@@ -678,19 +683,18 @@ class FigarA3CLearner(A3CLearner):
         if deterministic:
             frameskip = int(round(n * p)) + 1
         else:
-            # TODO maybe not round n - randomize
-            frameskip = round(np.random.binomial(round(n), p)) + 1
+            n = int(n) + int((n - int(n)) > random.random())
+            frameskip = round(np.random.binomial(n, p)) + 1
         return frameskip
-
-        # if deterministic:
-        #     frameskip_float = mu
-        # else:
-        #     frameskip_float = np.random.normal(mu, sigma)
-        # frameskip = int(max(1, round(frameskip_float)))
-        # return frameskip
 
     def _get_best_action(self, sess, state, deterministic=True):
         policy, frameskip_policy = self.local_network.get_policy(sess, state)
+
+        # give_fucks(self.thread_index, DEBUG, frameskip_policy)
+
+        if np.isnan(policy).any():
+            print("{} Aborting".format(self.thread_index))
+            exit(0)
         action_index = self.choose_best_index(policy, deterministic=deterministic)
         if self.binomial_frameskip:
             n, p = frameskip_policy
@@ -701,4 +705,16 @@ class FigarA3CLearner(A3CLearner):
         else:
             frameskip_index = self.choose_best_index(frameskip_policy, deterministic=deterministic)
             frameskip = self.frameskips[frameskip_index]
+
         return action_index, frameskip
+
+
+# np.set_printoptions(precision=2)
+# FILES = [open("stats/fucks/fuck_{}.txt".format(i), "w") for i in range(16)]
+#
+#
+# def give_fucks(th_i,p, fp):
+#     pi = " ".join(["{:0.2f}".format(pi) for pi in p])
+#     fn = " ".join(["{:0.2f}".format(n) for n in fp[0]])
+#     fp = " ".join(["{:0.2f}".format(p) for p in fp[1]])
+#     print("{} | {} | {}".format(pi, fn, fp), file=FILES[th_i])

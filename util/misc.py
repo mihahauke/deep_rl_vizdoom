@@ -73,7 +73,7 @@ def gray_square(val):
 
 
 def string_heatmap(mat, x_labels=None, y_labels=None):
-    # TODO refactor this piec of shit code some day
+    # TODO refactor this piece of shit code some day
     mat = mat - mat.min()
     mat /= mat.max()
     action_maxes = mat.max(1)
@@ -91,7 +91,7 @@ def string_heatmap(mat, x_labels=None, y_labels=None):
     space = "    "
     for row_i in range(mat.shape[0]):
         str_mat += str(y_labels[row_i]) + " " * (x_labels_len + 1 - len(str(y_labels[row_i])))
-        str_mat += " {:2.0f}%  ".format(np.sum(mat[row_i]) / mat_sum * 100)
+        str_mat += " {:3.0f}%  ".format(np.sum(mat[row_i]) / mat_sum * 100)
         for column_j in range(mat.shape[1]):
             str_mat += gray_square(mat[row_i, column_j])
 
@@ -104,6 +104,6 @@ def string_heatmap(mat, x_labels=None, y_labels=None):
     x_axis = ""
     for yl in x_labels:
         x_axis += (str(yl) + "  ")[0:2]
-    str_mat += "      " + x_axis + space + x_axis
+    str_mat += "       " + x_axis + space + x_axis
 
     return str_mat

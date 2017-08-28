@@ -1,0 +1,27 @@
+#use_misc: True
+#misc_scale: [0.01]
+#input_n_last_actions: 4
+scenario_tag: fake
+###########################################################
+epochs: 200
+local_steps_per_epoch: 8000
+test_episodes_per_epoch: 100
+test_interval: 5
+decay_steps: 1e5
+
+rmsprop:
+  decay: 0.99
+  momentum: 0.0
+  clip_norm: 40.0
+
+init_bias: 0
+frameskip: 1
+
+fake_game: true
+
+living_reward: -0.001
+miss_penalty: -0.001
+edge_penalty: -1
+map_len: 160
+map_height: 6
+boxes_num: 20
