@@ -562,4 +562,3 @@ class BinomialFigarACLSTMNet(CFigarACLSTMNet):
         policy_loss = - tf.reduce_sum((chosen_pi_log + fs_log_prob) * constant_advantage)
         value_loss = 0.5 * tf.reduce_sum(advantage ** 2)
         self.ops.loss = policy_loss + value_loss - entropy * self._entropy_beta - fsentropy * self._fsentropy_beta
-f
