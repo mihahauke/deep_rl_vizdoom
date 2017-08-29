@@ -2,9 +2,9 @@
 scenario_tag: fake
 ###########################################################
 epochs: 200
-local_steps_per_epoch: 8000
+local_steps_per_epoch: 16000
 test_episodes_per_epoch: 100
-test_interval: 5
+test_interval: 4
 decay_steps: 1e6
 
 rmsprop:
@@ -22,7 +22,7 @@ miss_penalty:  -0.04
 edge_penalty:  -1
 map_len:  160
 map_height:  30
-boxes_num:  20
+boxes_num:  10
 max_steps:  400
-box_span:  3
+box_span:  1
 min_box_dist: 10
