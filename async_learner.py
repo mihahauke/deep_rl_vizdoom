@@ -455,7 +455,7 @@ class ADQNLearner(A3CLearner):
             current_img, current_misc = self.doom_wrapper.get_current_state()
 
             if random.random() <= self.get_current_epsilon():
-                action_index = random.randint(0, self.actions_num - 1)
+                action_index = np.random.randint(0, self.actions_num)
                 if self.local_network.has_state():
                     self.local_network.update_network_state(self._session, [current_img, current_misc])
             else:
