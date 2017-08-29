@@ -188,7 +188,6 @@ class FakeVizdoomWrapper(object):
                  stack_n_frames=4,
                  reward_scale=1.0,
                  input_n_last_actions=False,
-                 seed=None,
                  max_steps=300,
                  map_len=160,
                  map_height=6,

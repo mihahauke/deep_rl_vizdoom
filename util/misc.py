@@ -74,7 +74,6 @@ def gray_square(val):
 
 def string_heatmap(mat, x_labels=None, y_labels=None):
     # TODO refactor this piece of shit code some day
-    mat = mat - mat.min()
     mat /= mat.max()
     action_maxes = mat.max(1)
     action_maxes[action_maxes == 0] = 1
