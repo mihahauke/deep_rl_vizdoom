@@ -28,9 +28,11 @@ class VizdoomWrapper(object):
                  hide_hood=False,
                  scenarios_path=os.path.join(vzd.__path__[0], "scenarios"),
                  seed=None,
+                 sound=False,
                  **kwargs):
         doom = vzd.DoomGame()
-
+        if sound:
+            doom.set_sound_enabled(True)
         if force_freedoom:
             doom.set_doom_game_path(vzd.__path__[0] + "/freedoom2.wad")
 
