@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 
-NAME="mgr"
-image_tag="mgr"
+NAME="mgr_`hostname`"
+image_tag=mgr
 
-nvidia-docker run --net=host -ti --name ${NAME} -v `pwd`:/home \
-    --entrypoint /bin/bash \
-    ${image_tag}
+nvidia-docker run \
+       --user=`id -u`:`id -g`\
+       --net=host \
+       -it \
+       --name ${NAME} \
+       -v `pwd`:/home \
+       --rm\
+               --entrypoint /bin/bash \
+        ${image_tag}
