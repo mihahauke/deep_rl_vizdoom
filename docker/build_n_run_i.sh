@@ -1,4 +1,16 @@
 #!/usr/bin/env bash
 
-TAG="mgr"
+
+NAME="mgr_`hostname`"
+image_tag=mgr
 docker build -t ${TAG} .
+
+nvidia-docker run \
+       --user=`id -u`:`id -g`\
+       --net=host \
+       -it \
+       --name ${NAME} \
+       -v `pwd`:/home \
+       --rm\
+               --entrypoint /bin/bash \
+        ${image_tag}
