@@ -6,7 +6,7 @@ TAG="mgr"
 
 docker build -t ${TAG} .
 
-docker run \
+nvidia-docker run \
         --user=`id -u`:`id -g`\
        --net=host \
        --name ${NAME} \
