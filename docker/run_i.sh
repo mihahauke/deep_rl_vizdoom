@@ -3,7 +3,7 @@
 NAME="mgr_`hostname`"
 image_tag=mgr
 
-docker run \
+nvidia-docker run \
        --user=`id -u`:`id -g`\
        --net=host \
        -it \
