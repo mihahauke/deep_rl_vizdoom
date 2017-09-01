@@ -58,7 +58,8 @@ RUN pip3 --no-cache-dir install \
          tqdm
 
 RUN echo "export LANG=en_US.UTF-8" > /etc/bash.bashrc
-WORKDIR /home
+WORKDIR /home/deep_rl_vizdoom
+ENV HOME /home
 
 
 

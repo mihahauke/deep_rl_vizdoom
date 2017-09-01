@@ -10,7 +10,7 @@ nvidia-docker run \
         --user=`id -u`:`id -g`\
        --net=host \
        --name ${NAME} \
-       -v `pwd`:/home \
+       -v `pwd`:/home/deep_rl_vizdoom \
        --rm\
         ${TAG} \
         "$@"
