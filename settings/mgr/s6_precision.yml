@@ -1,0 +1,18 @@
+config_file: precision.cfg
+scenarios_path: benchmark_scenarios/scenarios
+scenario_tag: precision
+
+###########################################################
+epochs: 200
+local_steps_per_epoch: 16000
+test_episodes_per_epoch: 100
+test_interval: 4
+decay_steps: 1e6
+
+rmsprop:
+  decay: 0.99
+  momentum: 0.0
+  clip_norm: 0.0
+
+init_bias: 0
+frameskip: 1
