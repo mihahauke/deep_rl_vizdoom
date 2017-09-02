@@ -1,7 +1,7 @@
 #input_n_last_actions: 4
 scenario_tag: fake
 ###########################################################
-epochs: 200
+epochs: 50
 local_steps_per_epoch: 16000
 test_episodes_per_epoch: 100
 test_interval: 4

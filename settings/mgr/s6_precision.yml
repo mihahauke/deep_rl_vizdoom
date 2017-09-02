@@ -3,7 +3,7 @@ scenarios_path: benchmark_scenarios/scenarios
 scenario_tag: precision
 
 ###########################################################
-epochs: 200
+epochs: 50
 local_steps_per_epoch: 16000
 test_episodes_per_epoch: 100
 test_interval: 4
@@ -16,3 +16,4 @@ rmsprop:
 
 init_bias: 0
 frameskip: 1
+run_tag: prec
