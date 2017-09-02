@@ -62,7 +62,8 @@ def train_dqn():
     if args.run_tag is not None:
         settings["run_tag"] = args.run_tag
         model_savefile = _train_common(settings)
-
+    if args.frameskip is not None:
+        settings["frameskip"] = args.frameskip
     from _dqn_algo import DQN
     dqn = DQN(model_savefile=model_savefile, **settings)
 
@@ -77,6 +78,8 @@ def train_dqn():
 def train_a3c():
     args = parse_train_a3c_args()
     settings = load_settings(DEFAULT_A3C_SETTINGS_FILE, args.settings_yml)
+    if args.frameskip is not None:
+        settings["frameskip"] = args.frameskip
     if args.run_tag is not None:
         settings["run_tag"] = args.run_tag
     model_savefile = _train_common(settings)
@@ -90,6 +93,8 @@ def train_adqn():
     settings = load_settings(DEFAULT_ADQN_SETTINGS_FILE, args.settings_yml)
     if args.run_tag is not None:
         settings["run_tag"] = args.run_tag
+    if args.frameskip is not None:
+        settings["frameskip"] = args.frameskip
     model_savefile = _train_common(settings)
 
     from _async_algo import train_async
@@ -125,6 +130,7 @@ def test_dqn():
 
 def test_a3c():
     args = parse_test_a3c_args()
+
     # TODO load settings that are with the model
     settings = load_settings(DEFAULT_A3C_SETTINGS_FILE, args.settings_yml)
     _test_common(args, settings)

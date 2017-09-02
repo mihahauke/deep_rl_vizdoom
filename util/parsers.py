@@ -32,6 +32,12 @@ def _create_train_parser(description):
                         metavar="RUN_TAG",
                         help="Prefix added to tensorboard summaries",
                         default=None)
+    parser.add_argument("--frameskip", "-fs",
+                        dest="frameskip",
+                        metavar='FRAMESKIP',
+                        type=int,
+                        default=None,
+                        help="Override frameskip setting.")
     return parser
 
 
