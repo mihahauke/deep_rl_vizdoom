@@ -8,7 +8,7 @@ nvidia-docker run \
        --net=host \
        -it \
        --name ${NAME} \
-       -v `pwd`:/home \
+       -v `pwd`:/home/deep_rl_vizdoom \
        --rm\
-               --entrypoint /bin/bash \
+       --entrypoint /bin/bash \
         ${image_tag}
