@@ -1,0 +1,7 @@
+run_tag: figar10
+
+dynamic_frameskips: 10
+learner_class: FigarA3CLearner
+network_class: FigarACLSTMNet
+frameskip_stop_gradient: False
+figar_gamma: True
