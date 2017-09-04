@@ -381,6 +381,7 @@ class A3CLearner(Thread):
                     self.train_actions = []
                     self.train_frameskips = []
 
+            threadsafe_print("Thread {} finished.".format(self.thread_index))
         except (SignalException, ViZDoomUnexpectedExitException):
             threadsafe_print(red("Thread #{} aborting(ViZDoom killed).".format(self.thread_index)))
 
