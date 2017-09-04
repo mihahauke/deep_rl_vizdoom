@@ -1,0 +1,16 @@
+initial_fsentropy_beta: 0.005
+final_fsentropy_beta: 0.0
+
+############################################################
+
+learner_class: FigarA3CLearner
+network_class: BinomialFigarACLSTMNet
+
+cfigar: True
+multi_frameskip: False
+figar_gamma: True
+gamma_compensation: False
+
+frameskip_stop_gradient: False
+fs_n_bias: 20
+fs_p_bias: 0
