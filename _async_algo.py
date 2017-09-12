@@ -108,11 +108,17 @@ def test_async(q_learning, settings, modelfile, eps, deterministic=True, output=
     # TODO: it's a workaround polynomial decays use global step, remove it somehow
     tf.Variable(0, trainable=False, name="global_step")
 
+    if settings["fake_game"]:
+        Game = FakeVizdoomWrapper
+    else:
+        Game = VizdoomWrapper
+
     if q_learning:
-        agent = async_learner.ADQNLearner(thread_index=0, session=session, **settings)
+        agent = async_learner.ADQNLearner(thread_index=0, session=session, game=Game(**settings), **settings)
     else:
         LearnerClass = getattr(async_learner, settings["learner_class"])
-        agent = LearnerClass(thread_index=0, session=session, **settings)
+        agent = LearnerClass(thread_index=0, session=session, game=Game(**settings),
+                             **settings)
 
     log("Initializing variables...")
     session.run(tf.global_variables_initializer())
