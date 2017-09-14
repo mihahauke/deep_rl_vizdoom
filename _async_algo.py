@@ -14,6 +14,7 @@ from util.coloring import green
 from util.logger import log
 from util.optimizers import ClippingRMSPropOptimizer
 from vizdoom_wrapper import VizdoomWrapper, FakeVizdoomWrapper
+from tqdm import trange
 
 
 def train_async(model_savefile, q_learning, settings):
@@ -100,7 +101,8 @@ def train_async(model_savefile, q_learning, settings):
         l.join()
 
 
-def test_async(q_learning, settings, modelfile, eps, deterministic=True, output=None):
+def test_async(q_learning, settings, modelfile, eps, deterministic=True, output=None, verbose=False,
+               show_progress=True):
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     session = tf.InteractiveSession(config=config)
@@ -126,17 +128,23 @@ def test_async(q_learning, settings, modelfile, eps, deterministic=True, output=
 
     agent.load_model(session, modelfile)
 
-    log("\nScores: ")
+    if verbose:
+        log("\nScores: ")
     scores = []
 
     stats = {"episodes": [],
              "actions": [],
              "frameskips": []}
 
-    for _ in range(eps):
+    if show_progress:
+        range_func = trange
+    else:
+        range_func = trange
+
+    for _ in range_func(eps):
         score, actions, frameskips, rewards = agent.run_episode(deterministic=deterministic, return_stats=True)
         scores.append(score)
-        print("{0:3f}".format(score))
+        # print("{0:3f}".format(score))
         if output is not None:
             episode_stats = {"score": score,
                              "rewards": rewards,
@@ -146,7 +154,8 @@ def test_async(q_learning, settings, modelfile, eps, deterministic=True, output=
             stats["frameskips"] += frameskips
             stats["episodes"].append(episode_stats)
 
-    print()
+    if verbose:
+        print()
     log("\nMean score: {:0.3f}".format(np.mean(scores)))
 
     if output is not None:

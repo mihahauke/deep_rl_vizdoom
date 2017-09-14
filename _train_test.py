@@ -23,12 +23,17 @@ def _test_common(args, settings):
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(settings["tf_log_level"])
 
     settings["display"] = not args.hide_window
-    settings["vizdoom_async_mode"] = not args.hide_window
+    settings["vizdoom_async_mode"] =  not args.hide_window
     settings["smooth_display"] = not args.agent_view
     settings["fps"] = args.fps
     settings["seed"] = args.seed
     settings["write_summaries"] = False
     settings["test_only"] = True
+
+
+# TODO remove the type after tests
+SETTINGS_SAVEFILE = "setings.yml"
+MODEL_FILE = "model"
 
 
 def _train_common(settings):
@@ -47,7 +52,7 @@ def _train_common(settings):
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(settings["tf_log_level"])
     model_dir = os.path.join(settings["models_path"], settings["scenario_tag"], run_id_string)
     model_file = os.path.join(model_dir, "model")
-    settings_output_file = os.path.join(model_dir, "setings.yml")
+    settings_output_file = os.path.join(model_dir, SETTINGS_SAVEFILE)
 
     ensure_parent_directories(settings_output_file)
     log("Saving settings to: {}".format(settings_output_file))
@@ -103,8 +108,9 @@ def train_adqn():
 
 def test_dqn():
     args = parse_test_dqn_args()
-    # TODO load settings that are with the model
-    settings = load_settings(DEFAULT_DQN_SETTINGS_FILE, args.settings_yml)
+    settings_file = os.path.join(args.model, SETTINGS_SAVEFILE)
+    modelfile = os.path.join(args.model, MODEL_FILE)
+    settings = load_settings(DEFAULT_DQN_SETTINGS_FILE, [settings_file])
 
     _test_common(args, settings)
 
@@ -115,7 +121,7 @@ def test_dqn():
     config.gpu_options.allow_growth = True
     session = tf.InteractiveSession(config=config)
     session.run(tf.global_variables_initializer())
-    dqn.load_model(session, args.model)
+    dqn.load_model(session, modelfile)
 
     log("\nScores: ")
     scores = []
@@ -131,14 +137,16 @@ def test_dqn():
 def test_a3c():
     args = parse_test_a3c_args()
 
-    # TODO load settings that are with the model
-    settings = load_settings(DEFAULT_A3C_SETTINGS_FILE, args.settings_yml)
+    settings_file = os.path.join(args.model, SETTINGS_SAVEFILE)
+    modelfile = os.path.join(args.model, MODEL_FILE)
+    settings = load_settings(DEFAULT_A3C_SETTINGS_FILE, [settings_file])
+
     _test_common(args, settings)
 
     from _async_algo import test_async
     test_async(q_learning=False,
                settings=settings,
-               modelfile=args.model,
+               modelfile=modelfile,
                eps=args.episodes_num,
                deterministic=bool(args.deterministic),
                output=args.output)
@@ -146,14 +154,15 @@ def test_a3c():
 
 def test_adqn():
     args = parse_test_adqn_args()
-    # TODO load settings that are with the model
-    settings = load_settings(DEFAULT_ADQN_SETTINGS_FILE, args.settings_yml)
+    settings_file = os.path.join(args.model, SETTINGS_SAVEFILE)
+    modelfile = os.path.join(args.model, MODEL_FILE)
+    settings = load_settings(DEFAULT_ADQN_SETTINGS_FILE, [settings_file])
     _test_common(args, settings)
 
     from _async_algo import test_async
     test_async(q_learning=True,
                settings=settings,
-               modelfile=args.model,
+               modelfile=modelfile,
                eps=args.episodes_num,
                deterministic=args.deterministic,
                output=args.output)

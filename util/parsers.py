@@ -11,7 +11,7 @@ SETTINGS_HELP_MSG = "load settings from yaml files. " \
 Q_HELP_MSG = "use n-step qlearning instead of a3c"
 
 
-def _create_default_parser(description):
+def _create_train_parser(description):
     parser = argparse.ArgumentParser(description=description,
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--settings", "-s",
@@ -21,11 +21,6 @@ def _create_default_parser(description):
                         type=str,
                         default=[DEFAULT_SETTINGS_FILE],
                         help=SETTINGS_HELP_MSG)
-    return parser
-
-
-def _create_train_parser(description):
-    parser = _create_default_parser(description=description)
     parser.add_argument("--run_tag",
                         "-rt",
                         dest="run_tag",
@@ -42,13 +37,13 @@ def _create_train_parser(description):
 
 
 def _create_test_parser(description):
-    parser = _create_default_parser(description=description)
-    parser.add_argument(
-        dest="model",
-        metavar="MODEL_FILE",
-        type=str,
-        help="Path to trained model."
-    )
+    parser = argparse.ArgumentParser(description=description,
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument(dest="model",
+                        metavar="MODEL_PATH",
+                        type=str,
+                        help="Path to trained model directory."
+                        )
     parser.add_argument("--episodes", "-e",
                         dest="episodes_num",
                         metavar="EPISODES_NUM",
@@ -70,7 +65,7 @@ def _create_test_parser(description):
                         const=True,
                         help="Print settings upon loading."
                         )
-    parser.add_argument("--fps",
+    parser.add_argument("--fps", "-fps",
                         dest="fps",
                         metavar="FRAMERATE",
                         default=35,
@@ -85,22 +80,20 @@ def _create_test_parser(description):
                         help="If True, window will display exactly what agent sees(with frameskip), "
                              "not the smoothed out version."
                         )
-    parser.add_argument("--seed",
+    parser.add_argument("--seed", "-seed",
                         dest="seed",
                         metavar="SEED",
                         default=None,
                         type=int,
                         help="Seed for ViZDoom."
                         )
-    parser.add_argument("-o",
-                        "--output",
+    parser.add_argument("-o", "--output",
                         dest="output",
                         metavar="STATS_OUTPUT_FILE",
                         default=None,
                         help="File for output of stats"
                         )
-    parser.add_argument("--deterministic",
-                        "-d",
+    parser.add_argument("--deterministic", "-d",
                         dest="deterministic",
                         metavar="DETERMINISTIC",
                         default=1,

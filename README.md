@@ -52,42 +52,42 @@ For convenience, multiple yml files with scenarios are held separately.
 ### Watching (test_a3c.py / test_adqn.py / test_dqn.py):
 
 ```bash
-./test_a3c.py -h
-usage: test_a3c.py [-h] [--settings [YAML_FILE [YAML_FILE ...]]]
-                   [--episodes EPISODES_NUM] [--hide-window]
-                   [--print-settings] [-fps FRAMERATE] [--agent-view]
-                   [--seed SEED]
-                   MODEL_FILE
+usage: test_a3c.py [-h] [--episodes EPISODES_NUM] [--hide-window]
+                   [--print-settings] [--fps FRAMERATE] [--agent-view]
+                   [--seed SEED] [-o STATS_OUTPUT_FILE]
+                   [--deterministic DETERMINISTIC]
+                   MODEL_PATH
 
 A3C: testing script for ViZDoom
 
 positional arguments:
-  MODEL_FILE            Path to trained model.
+  MODEL_PATH            Path to trained model directory.
 
 optional arguments:
   -h, --help            show this help message and exit
-  --settings [YAML_FILE [YAML_FILE ...]], -s [YAML_FILE [YAML_FILE ...]]
-                        load settings from yaml files. If multiple files are
-                        specified, overlapping settings will be overwritten
-                        according to order of appearance (e.g. settings from
-                        file #1 will be overwritten by file #2). (default:
-                        ['settings/basic.yml'])
   --episodes EPISODES_NUM, -e EPISODES_NUM
                         Number of episodes to test. (default: 10)
   --hide-window, -ps    Hide window. (default: False)
   --print-settings, -hw
                         Print settings upon loading. (default: False)
-  -fps FRAMERATE        If window is visible, tests will be run with given
+  --fps FRAMERATE, -fps FRAMERATE
+                        If window is visible, tests will be run with given
                         framerate. (default: 35)
-  --agent-view, -aw     If True, window will display exactly what agent
+  --agent-view, -av     If True, window will display exactly what agent
                         sees(with frameskip), not the smoothed out version.
                         (default: False)
-  --seed SEED           Seed for ViZDoom. (default: None)
+  --seed SEED, -seed SEED
+                        Seed for ViZDoom. (default: None)
+  -o STATS_OUTPUT_FILE, --output STATS_OUTPUT_FILE
+                        File for output of stats (default: None)
+  --deterministic DETERMINISTIC, -d DETERMINISTIC
+                        If 1 dtests will be deterministic. (default: 1)
+
 
 ```
 ## Example:
 ```bash
 # You need to have a pretrained model
-./train_a3c.py -s models/basic/ACLstmNet_16TH/30June17_20.12 settings/examples/basic_a3c.yml 
+./test_a3c.py models/basic/ACLSTMNet/09.04_11-21 -e 10 --seed 123
 ```
 
