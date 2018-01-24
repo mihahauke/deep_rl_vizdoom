@@ -1,0 +1,14 @@
+config_file: basic.cfg
+scenario_tag: basic
+reward_scale: 0.01
+
+resolution: [40, 30]
+conv_filters_num: [ 32,  32 ]
+conv_filters_sizes: [ 4, 3 ]
+conv_strides: [ 2, 1 ]
+# General training options
+train_steps_per_epoch: 5000
+frozen_steps: 2000
+
+run_tag: dqn_basic
+use_misc: false
