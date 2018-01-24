@@ -243,7 +243,7 @@ class DQN(object):
                     self._test_writer.add_summary(test_summary, self.steps)
             # Save model
             if self._epoch % self.save_interval == 0:
-                self.save_model()
+                self.save_model(session)
 
             overall_time = time() - overall_start_time
             log("Total elapsed time: {}\n".format(sec_to_str(overall_time)))
