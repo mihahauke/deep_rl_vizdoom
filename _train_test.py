@@ -66,9 +66,10 @@ def train_dqn():
     settings = load_settings(DEFAULT_DQN_SETTINGS_FILE, args.settings_yml)
     if args.run_tag is not None:
         settings["run_tag"] = args.run_tag
-        model_savefile = _train_common(settings)
+
     if args.frameskip is not None:
         settings["frameskip"] = args.frameskip
+    model_savefile = _train_common(settings)
     from _dqn_algo import DQN
     dqn = DQN(model_savefile=model_savefile, **settings)
 
