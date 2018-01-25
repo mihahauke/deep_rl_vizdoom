@@ -133,5 +133,5 @@ class DuelingDQNNet(DQNNet):
             advantage = layers.linear(fc2_advantage, num_outputs=self.actions_num, scope=name_scope + "/fc3_advantage")
 
             mean_advantage = tf.reshape(tf.reduce_mean(advantage, axis=1), (-1, 1))
-            q_op = advantage + (mean_advantage - value)
+            q_op = value + (advantage - mean_advantage)
             return q_op
